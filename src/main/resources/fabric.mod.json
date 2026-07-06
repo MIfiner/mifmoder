@@ -1,0 +1,1 @@
+{ "schemaVersion": 1, "id": "mifmoder", "version": "1.0.0", "name": "Mif Mod", "description": "Minimal Fabric mod skeleton", "authors": ["YourName"], "contact": {}, "license": "MIT", "environment": "*", "entrypoints": { "main": [ "com.yourname.mifmoder.MifMod" ] }, "depends": { "fabricloader": ">=0.15.3", "minecraft": "1.21.4" } }
