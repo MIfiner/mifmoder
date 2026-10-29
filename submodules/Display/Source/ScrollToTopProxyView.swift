@@ -14,14 +14,17 @@ class ScrollToTopView: UIScrollView, UIScrollViewDelegate {
         if #available(iOS 17.0, *) {
             self.allowsKeyboardScrolling = false
         }
-        if #available(iOS 26.0, *) {
-            // An invisible tap target over the status bar, above every screen: UIKit's automatic edge effects would blur
-            // whatever passes under it. The chat → profile expansion showed it as a haze over the top of the screen and
-            // its corners, where the card's edge moves against the chat.
-            self.topEdgeEffect.isHidden = true
-            self.bottomEdgeEffect.isHidden = true
-            self.leftEdgeEffect.isHidden = true
-            self.rightEdgeEffect.isHidden = true
+        // An invisible tap target over the status bar, above every screen: UIKit's automatic edge effects would blur
+        // whatever passes under it. The chat → profile expansion showed it as a haze over the top of the screen and
+        // its corners, where the card's edge moves against the chat.
+        for key in ["topEdgeEffect", "bottomEdgeEffect", "leftEdgeEffect", "rightEdgeEffect"] {
+            let sel = NSSelectorFromString(key)
+            if self.responds(to: sel), let effect = self.perform(sel)?.takeUnretainedValue() as? NSObject {
+                let setHiddenSel = NSSelectorFromString("setHidden:")
+                if effect.responds(to: setHiddenSel) {
+                    _ = effect.perform(setHiddenSel, with: true as NSNumber)
+                }
+            }
         }
     }
     

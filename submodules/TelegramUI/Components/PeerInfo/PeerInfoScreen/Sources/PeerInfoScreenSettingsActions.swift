@@ -17,6 +17,7 @@ import PasswordSetupUI
 import InstantPageCache
 import WalletContext
 import UndoUI
+import LightGramCore
 
 extension PeerInfoScreenNode {
     func openSettings(section: PeerInfoSettingsSection) {
@@ -51,6 +52,8 @@ extension PeerInfoScreenNode {
             }
         }
         switch section {
+        case .lightGram:
+            push(LightGramSettingsController())
         case .avatar:
             self.controller?.openAvatarForEditing()
         case .edit:

@@ -253,6 +253,9 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
     } else {
         notificationsWarning = false
     }
+    items[.advanced]!.append(PeerInfoScreenDisclosureItem(id: 999, label: .titleBadge("V1", UIColor(rgb: 0xEDB400)), text: "LightGram Settings", icon: PresentationResourcesSettings.lightGram, action: {
+        interaction.openSettings(.lightGram)
+    }))
     items[.advanced]!.append(PeerInfoScreenDisclosureItem(id: 0, label: notificationsWarning ? .badge("!", presentationData.theme.list.itemDestructiveColor) : .none, text: presentationData.strings.Settings_NotificationsAndSounds, icon: PresentationResourcesSettings.notifications, action: {
         interaction.openSettings(.notificationsAndSounds)
     }))

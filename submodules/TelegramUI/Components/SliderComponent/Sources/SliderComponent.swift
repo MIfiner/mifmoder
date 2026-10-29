@@ -232,7 +232,7 @@ public final class SliderComponent: Component {
                     case let .discrete(discrete):
                         sliderView.minimumValue = 0.0
                         sliderView.maximumValue = Float(discrete.valueCount - 1)
-                        sliderView.trackConfiguration = .init(numberOfTicks: discrete.valueCount)
+                        // sliderView.trackConfiguration = .init(numberOfTicks: discrete.valueCount)
                     }
                 }
                 switch component.content {

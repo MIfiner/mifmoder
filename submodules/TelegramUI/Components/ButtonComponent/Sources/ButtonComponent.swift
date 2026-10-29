@@ -522,12 +522,17 @@ public final class ButtonComponent: Component {
                 mask.endPoint = CGPoint(x: 1, y: 1)
                 let r = max(0.001, radius)
                 mask.frame = CGRect(x: origin.x - r, y: origin.y - r, width: r * 2, height: r * 2)
-                mask.colors = (0...8).map { index in
-                    let t = CGFloat(index) / 8
-                    return UIColor.black.withAlphaComponent(1 - t * t * (3 - 2 * t)).cgColor
+                mask.colors = (0...8).map { (index: Int) -> CGColor in
+                    let t: CGFloat = CGFloat(index) / 8.0
+                    let alpha: CGFloat = 1.0 - t * t * (3.0 - 2.0 * t)
+                    return UIColor.black.withAlphaComponent(alpha).cgColor
                 }
-                mask.locations = (0...8).map { index in
-                    NSNumber(value: Double(max(0, 1 - 18 / r) + min(1, 18 / r) * CGFloat(index) / 8))
+                let baseOffset: CGFloat = max(0.0, 1.0 - 18.0 / r)
+                let span: CGFloat = min(1.0, 18.0 / r)
+                mask.locations = (0...8).map { (index: Int) -> NSNumber in
+                    let progress: CGFloat = CGFloat(index) / 8.0
+                    let val: Double = Double(baseOffset + span * progress)
+                    return NSNumber(value: val)
                 }
                 layer.mask = mask
             }

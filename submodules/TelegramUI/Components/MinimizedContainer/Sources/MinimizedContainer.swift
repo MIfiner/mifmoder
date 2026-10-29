@@ -367,11 +367,15 @@ public class MinimizedContainerImpl: ASDisplayNode, MinimizedContainer, ASScroll
         self.scrollView = ScrollViewImpl()
         self.scrollView.contentInsetAdjustmentBehavior = .never
         self.scrollView.alwaysBounceVertical = true
-        if #available(iOS 26.0, *) {
-            // UIKit's automatic top edge effect samples what is behind the container (the screen under it) and blurs it
-            // at the scroll view's top: it showed as a blur over the chat's navigation bar while closing a minimized app
-            // slid the scroll view down. The container draws its own edges.
-            self.scrollView.topEdgeEffect.isHidden = true
+        // UIKit's automatic top edge effect samples what is behind the container (the screen under it) and blurs it
+        // at the scroll view's top: it showed as a blur over the chat's navigation bar while closing a minimized app
+        // slid the scroll view down. The container draws its own edges.
+        let topEdgeEffectSel = NSSelectorFromString("topEdgeEffect")
+        if self.scrollView.responds(to: topEdgeEffectSel), let effect = self.scrollView.perform(topEdgeEffectSel)?.takeUnretainedValue() as? NSObject {
+            let setHiddenSel = NSSelectorFromString("setHidden:")
+            if effect.responds(to: setHiddenSel) {
+                _ = effect.perform(setHiddenSel, with: true as NSNumber)
+            }
         }
 
         super.init()

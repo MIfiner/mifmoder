@@ -115,8 +115,10 @@ let colorOrange = UIColor(rgb: 0xFF9F0A)
 let colorPurple = UIColor(rgb: 0xAF52DE)
 let colorGray = UIColor(rgb: 0x8E8E93)
 let colorViolet = UIColor(rgb: 0x5E5CE6)
+let colorYellow = UIColor(rgb: 0xEDB400)
 
 public struct PresentationResourcesSettings {
+    public static let lightGram = renderSettingsIcon(name: "Item List/Icons/Appearance", backgroundColors: [colorYellow])
     public static let proxy = renderSettingsIcon(name: "Item List/Icons/Proxy", backgroundColors: [colorGreen])
     public static let savedMessages = renderSettingsIcon(name: "Item List/Icons/SavedMessages", backgroundColors: [colorBlue])
     public static let recentCalls = renderSettingsIcon(name: "Item List/Icons/Phone", backgroundColors: [colorGreen])

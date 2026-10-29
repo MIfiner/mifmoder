@@ -20,6 +20,10 @@ import ComponentFlow
 import GlassBackgroundComponent
 import TextFormat
 
+private struct SendableCaptionHolder: @unchecked Sendable {
+    let value: NSAttributedString?
+}
+
 public enum AttachmentButtonType: Equatable {
     case gallery
     case file
@@ -791,7 +795,8 @@ public class AttachmentController: ViewController, MinimizableController {
                         return
                     }
 
-                    guard let caption = await mediaPickerContext.caption.get() else {
+                    let captionHolder = await (mediaPickerContext.caption |> map { SendableCaptionHolder(value: $0) }).get()
+                    guard let caption = captionHolder.value else {
                         return
                     }
                     if caption.length == 0 {

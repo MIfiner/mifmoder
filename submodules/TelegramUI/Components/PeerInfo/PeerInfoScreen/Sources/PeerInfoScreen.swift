@@ -161,6 +161,7 @@ enum PeerInfoContextSubject {
 }
 
 enum PeerInfoSettingsSection {
+    case lightGram
     case avatar
     case edit
     case proxy
