@@ -1,0 +1,269 @@
+name: LightGram V1 — Build & Release IPA
+
+on:
+  push:
+    branches:
+      - lightgram-v1
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build configuration'
+        required: true
+        default: 'release_arm64'
+        type: choice
+        options:
+          - 'release_arm64'
+          - 'debug_arm64'
+          - 'release_sim_arm64'
+      codesigning_mode:
+        description: 'Code signing mode'
+        required: true
+        default: 'sideloading_self_signed'
+        type: choice
+        options:
+          - 'sideloading_self_signed'
+          - 'custom_secrets'
+      create_github_release:
+        description: 'Create GitHub Release with IPA asset'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build-lightgram:
+    name: Build LightGram V1 IPA
+    runs-on: macos-15
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout LightGram source code and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          fetch-depth: '0'
+
+      - name: Inspect environment and toolchain
+        run: |
+          echo "=== System Architecture & OS ==="
+          uname -a
+          sw_vers
+
+          echo "=== Python ==="
+          python3 --version
+
+          echo "=== Available Xcode installations ==="
+          ls -d /Applications/Xcode*.app || true
+          xcode-select -p
+
+          echo "=== Git status & commit ==="
+          git status
+          git log -n 1 --oneline
+
+      - name: Select optimal Xcode version
+        run: |
+          # Select compatible Xcode 16 for macOS 15 host toolchain
+          LATEST_XCODE=$(ls -d /Applications/Xcode_16*.app /Applications/Xcode.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -n "$LATEST_XCODE" ]; then
+            echo "Selecting $LATEST_XCODE"
+            sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+            export DEVELOPER_DIR="$LATEST_XCODE/Contents/Developer"
+            echo "DEVELOPER_DIR=$LATEST_XCODE/Contents/Developer" >> $GITHUB_ENV
+          else
+            echo "Using default Xcode: $(xcode-select -p)"
+          fi
+          xcodebuild -version
+
+      - name: Validate LightGram assets and configuration
+        run: |
+          echo "=== Verifying App Icons ==="
+          ls -lh Telegram/Telegram-iOS/DefaultAppIcon.xcassets/AppIconLLC.appiconset/Simple-iTunesArtwork.png
+          test -s Telegram/Telegram-iOS/DefaultAppIcon.xcassets/AppIconLLC.appiconset/Simple-iTunesArtwork.png
+          echo "App icon verified successfully."
+
+          echo "=== Verifying LightGram configuration ==="
+          cat build-system/lightgram-configuration.json
+
+          echo "=== Verifying Bundle ID and Display Name ==="
+          grep -rn "LightGram V1" Telegram/BUILD Telegram/Telegram-iOS/InfoBazel.plist
+
+      - name: Apply secrets if provided
+        env:
+          CUSTOM_API_ID: ${{ secrets.LIGHTGRAM_API_ID }}
+          CUSTOM_API_HASH: ${{ secrets.LIGHTGRAM_API_HASH }}
+          CUSTOM_TEAM_ID: ${{ secrets.LIGHTGRAM_TEAM_ID }}
+          CUSTOM_BUNDLE_ID: ${{ secrets.LIGHTGRAM_BUNDLE_ID }}
+        run: |
+          python3 - << 'EOF'
+          import json, os, subprocess
+
+          config_path = "build-system/lightgram-configuration.json"
+          with open(config_path, "r") as f:
+            data = json.load(f)
+
+          if os.getenv("CUSTOM_API_ID"):
+            data["api_id"] = os.getenv("CUSTOM_API_ID").strip()
+            print("Configured custom Telegram API ID from secret")
+
+          if os.getenv("CUSTOM_API_HASH"):
+            data["api_hash"] = os.getenv("CUSTOM_API_HASH").strip()
+            print("Configured custom Telegram API HASH from secret")
+
+          if os.getenv("CUSTOM_TEAM_ID"):
+            data["team_id"] = os.getenv("CUSTOM_TEAM_ID").strip()
+            print("Configured custom Apple Team ID from secret")
+
+          if os.getenv("CUSTOM_BUNDLE_ID"):
+            data["bundle_id"] = os.getenv("CUSTOM_BUNDLE_ID").strip()
+            print("Configured custom Bundle ID from secret")
+
+          with open(config_path, "w") as f:
+            json.dump(data, f, indent=2)
+
+          # Update profiles to match bundle_id and team_id
+          bundle_id = data.get("bundle_id", "site.lightgram.ios")
+          team_id = data.get("team_id", "C67CF9S4VU")
+          subprocess.check_call(["python3", "tools/update_fake_codesigning_profiles.py", bundle_id, team_id])
+          EOF
+
+      - name: Prepare code signing certificates
+        env:
+          INPUT_SIGNING_MODE: ${{ inputs.codesigning_mode }}
+          P12_BASE64: ${{ secrets.LIGHTGRAM_CERTIFICATE_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.LIGHTGRAM_CERTIFICATE_PASSWORD }}
+          PROVISIONING_BASE64: ${{ secrets.LIGHTGRAM_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          SIGNING_MODE="${INPUT_SIGNING_MODE:-sideloading_self_signed}"
+          if [ "$SIGNING_MODE" = "custom_secrets" ] && [ -n "$P12_BASE64" ]; then
+            echo "Setting up custom signing identity from secrets..."
+            mkdir -p build-system/custom-codesigning/certs
+            mkdir -p build-system/custom-codesigning/profiles
+            echo "$P12_BASE64" | base64 --decode > build-system/custom-codesigning/certs/Developer.p12
+            if [ -n "$PROVISIONING_BASE64" ]; then
+              echo "$PROVISIONING_BASE64" | base64 --decode > build-system/custom-codesigning/profiles/Telegram.mobileprovision
+            fi
+            python3 build-system/Make/ImportCertificates.py --path build-system/custom-codesigning/certs
+            echo "CODESIGNING_PATH=build-system/custom-codesigning" >> $GITHUB_ENV
+          else
+            echo "Setting up self-signed certificates for sideloading / TrollStore..."
+            python3 build-system/Make/ImportCertificates.py --path build-system/fake-codesigning/certs
+            echo "CODESIGNING_PATH=build-system/fake-codesigning" >> $GITHUB_ENV
+          fi
+
+      - name: Build LightGram V1 via Bazel
+        env:
+          INPUT_CONFIGURATION: ${{ inputs.configuration }}
+        run: |
+          set -x
+
+          CONFIG="${INPUT_CONFIGURATION:-release_arm64}"
+          BAZEL_USER_ROOT="/private/var/tmp/_bazel_containerhost"
+          BUILD_OFFSET=100000
+          COMMIT_COUNT=$(git rev-list --count HEAD 2>/dev/null || echo 1)
+          BUILD_NUMBER=$((COMMIT_COUNT + BUILD_OFFSET))
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
+
+          APP_VERSION=$(python3 -c 'import json; print(json.load(open("versions.json"))["app"])')
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+
+          echo "Starting compilation of LightGram V1 ($APP_VERSION build $BUILD_NUMBER in $CONFIG mode)..."
+
+          python3 -u build-system/Make/Make.py \
+            --overrideXcodeVersion \
+            --overrideBazelVersion \
+            --bazelUserRoot="$BAZEL_USER_ROOT" \
+            build \
+            --configurationPath="build-system/lightgram-configuration.json" \
+            --codesigningInformationPath="$CODESIGNING_PATH" \
+            --configuration="$CONFIG" \
+            --buildNumber="$BUILD_NUMBER" \
+            --outputBuildArtifactsPath="build/artifacts" \
+            --continueOnError
+
+      - name: Package and verify IPA artifact
+        run: |
+          mkdir -p build/artifacts
+          mkdir -p build/DSYMs
+
+          # Locate built IPA from artifacts path or bazel output
+          IPA_SRC=""
+          if [ -f "build/artifacts/Telegram.ipa" ]; then
+            IPA_SRC="build/artifacts/Telegram.ipa"
+          else
+            IPA_SRC=$(find bazel-bin/Telegram bazel-out -name "*.ipa" 2>/dev/null | head -n 1)
+          fi
+
+          if [ -z "$IPA_SRC" ] || [ ! -f "$IPA_SRC" ]; then
+            echo "Error: IPA file was not found in Bazel output directory!"
+            find bazel-out bazel-bin build -maxdepth 5 2>/dev/null | head -n 100
+            exit 1
+          fi
+
+          echo "Found IPA at: $IPA_SRC"
+          cp "$IPA_SRC" build/artifacts/LightGram-V1.ipa
+
+          # Locate and zip DSYMs if not already packaged
+          if [ ! -f "build/artifacts/Telegram.DSYMs.zip" ]; then
+            find bazel-bin/Telegram bazel-out -name "*.dSYM" -exec cp -R {} build/DSYMs/ \; 2>/dev/null || true
+            if [ -d "build/DSYMs" ] && [ "$(ls -A build/DSYMs)" ]; then
+              (cd build && zip -r "./artifacts/LightGram-V1.DSYMs.zip" DSYMs > /dev/null)
+            fi
+          else
+            cp build/artifacts/Telegram.DSYMs.zip build/artifacts/LightGram-V1.DSYMs.zip
+          fi
+
+          echo "=== IPA Verification & Integrity Check ==="
+          ls -lh build/artifacts/LightGram-V1.ipa
+          unzip -l build/artifacts/LightGram-V1.ipa | grep -E "Payload/|Info.plist" | head -n 20
+
+          # Extract and check Info.plist
+          unzip -p build/artifacts/LightGram-V1.ipa "Payload/*.app/Info.plist" > /tmp/ipa_info.plist || true
+          if [ -f /tmp/ipa_info.plist ]; then
+            plutil -p /tmp/ipa_info.plist | grep -E "CFBundleIdentifier|CFBundleDisplayName|CFBundleShortVersionString" || true
+          fi
+
+      - name: Upload IPA as GitHub Actions Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LightGram-V1-iOS-${{ env.BUILD_NUMBER }}
+          path: build/artifacts/LightGram-V1.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload DSYMs as GitHub Actions Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LightGram-V1-DSYMs-${{ env.BUILD_NUMBER }}
+          path: build/artifacts/*.zip
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        if: ${{ inputs.create_github_release != false }}
+        continue-on-error: true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.APP_VERSION }}-b${{ env.BUILD_NUMBER }}
+          name: LightGram V1 (${{ env.APP_VERSION }}.${{ env.BUILD_NUMBER }})
+          body: |
+            ### LightGram V1 for iOS
+            **Version:** ${{ env.APP_VERSION }} (Build ${{ env.BUILD_NUMBER }})
+            **Bundle ID:** `site.lightgram.ios`
+            
+            #### Features:
+            - **Signature Dark & Yellow Aesthetic:** Deep graphite/OLED black design with elegant golden-yellow accents.
+            - **Ghost Mode:** Suppress message read receipts, typing indicators, and stealth story viewing.
+            - **Spy Mode:** Local audit archive for deleted messages and message edit revision history.
+            - **Smart Filters:** Convenient quick tabs for direct chats, groups, channels, bots, and unread messages.
+            - **Telegram Core:** Full MTProto support, authentic Telegram login, group chats, channels, calls, secret chats, and stickers.
+            
+            #### Installation:
+            Install `LightGram-V1.ipa` via **TrollStore**, **AltStore**, **Sideloadly**, **LiveContainer**, or **Scarlet**.
+          files: |
+            build/artifacts/LightGram-V1.ipa
+            build/artifacts/LightGram-V1.DSYMs.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
