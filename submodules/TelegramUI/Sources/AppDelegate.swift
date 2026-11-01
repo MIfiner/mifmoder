@@ -319,7 +319,11 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         let appGroupName = "group.\(baseAppBundleId)"
 
         let configuration = URLSessionConfiguration.background(withIdentifier: identifier)
-        configuration.sharedContainerIdentifier = appGroupName
+        if FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName) != nil {
+            configuration.sharedContainerIdentifier = appGroupName
+        } else {
+            print("[LightGram Launch] urlSession: App Group unavailable, using sandboxed background session")
+        }
         configuration.isDiscretionary = false
         let session = URLSession(configuration: configuration, delegate: self, delegateQueue: .main)
         self.urlSessions.append(session)
@@ -351,6 +355,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
     private var recaptchaClientsBySiteKey: [String: Promise<RecaptchaClient>] = [:]
         
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        print("[LightGram Launch] Application didFinishLaunching started")
         precondition(!testIsLaunched)
         testIsLaunched = true
         CrashReportCollector.shared.start()
@@ -570,9 +575,13 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         
         let baseAppBundleId = Bundle.main.bundleIdentifier!
         let appGroupName = "group.\(baseAppBundleId)"
-        try! PasscodeEnvironment.shared.configure(PasscodeConfiguration(appGroupIdentifier: appGroupName, processRole: .mainApp, biometricKeychainService: walletBiometricKeychainService), privateAccessGroup: {
-            BuildConfig.keychainAccessGroup(baseAppBundleId: baseAppBundleId)
-        })
+        do {
+            try PasscodeEnvironment.shared.configure(PasscodeConfiguration(appGroupIdentifier: appGroupName, processRole: .mainApp, biometricKeychainService: walletBiometricKeychainService), privateAccessGroup: {
+                BuildConfig.keychainAccessGroup(baseAppBundleId: baseAppBundleId)
+            })
+        } catch {
+            print("[LightGram Launch] PasscodeEnvironment configure notice: \(error)")
+        }
         let maybeAppGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName)
         
         let buildConfig = BuildConfig(baseAppBundleId: baseAppBundleId)
@@ -696,9 +705,17 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             networkEngineFactory: RustNetworkEngineFactory()
         )
         
-        guard let appGroupUrl = maybeAppGroupUrl else {
-            self.mainWindow?.presentNative(UIAlertController(title: nil, message: "Error 2", preferredStyle: .alert))
-            return true
+        let appGroupUrl: URL
+        if let maybeAppGroupUrl = maybeAppGroupUrl {
+            appGroupUrl = maybeAppGroupUrl
+            print("[LightGram Launch] App Group container: using system App Group at \(appGroupUrl.path)")
+        } else {
+            let appSupportUrls = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            let baseDir = appSupportUrls.first ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let fallbackContainer = baseDir.appendingPathComponent("LightGramContainer", isDirectory: true)
+            let _ = try? FileManager.default.createDirectory(at: fallbackContainer, withIntermediateDirectories: true, attributes: nil)
+            appGroupUrl = fallbackContainer
+            print("[LightGram Launch] App Group container: system App Group unavailable (sideloading mode), using local fallback at \(appGroupUrl.path)")
         }
         
         var isDebugConfiguration = false
@@ -729,6 +746,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         if !isUITest {
             performAppGroupUpgrades(appGroupPath: appGroupUrl.path, rootPath: rootPath)
         }
+        print("[LightGram Launch] Storage rootPath initialized at: \(rootPath)")
         
         let deviceSpecificEncryptionParameters = BuildConfig.deviceSpecificEncryptionParameters(rootPath, baseAppBundleId: baseAppBundleId)
         let encryptionParameters = ValueBoxEncryptionParameters(forceEncryptionIfNoSet: false, key: ValueBoxEncryptionParameters.Key(data: deviceSpecificEncryptionParameters.key)!, salt: ValueBoxEncryptionParameters.Salt(data: deviceSpecificEncryptionParameters.salt)!)
@@ -1066,6 +1084,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             try resetWalletLocalSecrets()
         })
         self.accountManager = accountManager
+        print("[LightGram Launch] AccountManager initialized successfully")
 
         telegramUIDeclareEncodables()
         initializeAccountManagement()
@@ -1131,6 +1150,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         }
         |> deliverOnMainQueue
         |> mapToSignal { [self] accountManager, initialPresentationDataAndSettings -> Signal<(SharedApplicationContext, LoggingSettings), NoError> in
+            print("[LightGram Launch] SharedContext signal evaluating, preparing presentation data and root controller")
             self.mainWindow?.hostView.containerView.backgroundColor =  initialPresentationDataAndSettings.presentationData.theme.chatList.backgroundColor
             
             let legacyBasePath = appGroupUrl.path
@@ -1423,6 +1443,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                         print("Application: context took \(readyTime) to become ready")
                     }
                     print("Launch to ready took \((CFAbsoluteTimeGetCurrent() - launchStartTime) * 1000.0) ms")
+                    print("[LightGram Launch] Context ready: assigning rootController to mainWindow")
 
                     self.mainWindow.debugAction = nil
                     self.mainWindow.viewController = context.rootController
@@ -1515,6 +1536,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                 |> filter { $0 }
                 |> take(1)
                 |> deliverOnMainQueue).start(next: { _ in
+                    print("[LightGram Launch] Auth context ready: presenting rootController on mainWindow")
                     progressDisposable.dispose()
                     self.mainWindow.present(context.rootController, on: .root)
                 }))

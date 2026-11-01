@@ -27,8 +27,12 @@ public final class LightGramSettings {
     }
     
     public init() {
-        if let sharedDefaults = UserDefaults(suiteName: "group.site.lightgram.ios") {
+        let bundleId = Bundle.main.bundleIdentifier ?? "site.lightgram.ios"
+        let groupName = "group.\(bundleId)"
+        if let sharedDefaults = UserDefaults(suiteName: groupName) {
             self.userDefaults = sharedDefaults
+        } else if let fallbackDefaults = UserDefaults(suiteName: "group.site.lightgram.ios") {
+            self.userDefaults = fallbackDefaults
         } else {
             self.userDefaults = UserDefaults.standard
         }
