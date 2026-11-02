@@ -1605,6 +1605,8 @@ static void copyKeychainDictionaryKey(NSString * _Nonnull group, NSString * _Non
     {
         NSNumber *infoKey = authInfoMapIntegerKey((int32_t)datacenterId, selector);
         
+        NSLog(@"[LightGram Net] authInfoRequired for DC%ld selector %d (inFlight: %s, retryScheduled: %s)", (long)datacenterId, (int)selector, _datacenterAuthActions[infoKey] != nil ? "YES" : "NO", _datacenterAuthRetryTimers[infoKey] != nil ? "YES" : "NO");
+        
         if (_datacenterAuthActions[infoKey] == nil && _datacenterAuthRetryTimers[infoKey] == nil)
         {
             __weak MTContext *weakSelf = self;
@@ -1915,7 +1917,43 @@ static void copyKeychainDictionaryKey(NSString * _Nonnull group, NSString * _Non
     [[MTContext contextQueue] dispatchOnQueue:^{
         MTApiEnvironment *apiEnvironment = f(_apiEnvironment);
         if (apiEnvironment != nil) {
+            MTSocksProxySettings *oldProxy = _apiEnvironment.socksProxySettings;
+            MTSocksProxySettings *newProxy = apiEnvironment.socksProxySettings;
+            bool proxyChanged = (oldProxy != nil) != (newProxy != nil) || (oldProxy != nil && ![oldProxy isEqual:newProxy]);
+            
             _apiEnvironment = apiEnvironment;
+            
+            if (proxyChanged) {
+                NSLog(@"[LightGram Net] MTContext proxy configuration changed (active: %s), cancelling stale auth actions and clearing retry timers", newProxy != nil ? "YES" : "NO");
+                
+                // Invalidate and clear datacenter auth retry timers
+                for (MTTimer *timer in _datacenterAuthRetryTimers.allValues) {
+                    [timer invalidate];
+                }
+                [_datacenterAuthRetryTimers removeAllObjects];
+                [_datacenterAuthFailureCounts removeAllObjects];
+                
+                // Cancel and clear in-flight datacenter auth actions
+                NSDictionary *authActions = [_datacenterAuthActions copy];
+                [_datacenterAuthActions removeAllObjects];
+                for (MTDatacenterAuthAction *action in authActions.allValues) {
+                    [action cancel];
+                }
+                
+                // Invalidate and clear transfer auth retry timers
+                for (MTTimer *timer in _datacenterTransferAuthRetryTimers.allValues) {
+                    [timer invalidate];
+                }
+                [_datacenterTransferAuthRetryTimers removeAllObjects];
+                [_datacenterTransferAuthFailureCounts removeAllObjects];
+                
+                // Cancel and clear in-flight transfer auth actions
+                NSDictionary *transferActions = [_datacenterTransferAuthActions copy];
+                [_datacenterTransferAuthActions removeAllObjects];
+                for (MTDatacenterTransferAuthAction *action in transferActions.allValues) {
+                    [action cancel];
+                }
+            }
             
             NSArray *changeListeners = [[NSArray alloc] initWithArray:_changeListeners];
             for (MTWeakContextChangeListener *value in changeListeners) {

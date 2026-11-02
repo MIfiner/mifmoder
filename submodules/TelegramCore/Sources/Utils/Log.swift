@@ -128,6 +128,7 @@ public final class Logger {
     public init(rootPath: String, basePath: String) {
         self.rootPath = rootPath
         self.basePath = basePath
+        NetworkSetLoggingEnabled(true)
     }
     
     public func sync() {

@@ -563,6 +563,8 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
             apiEnvironment.langPack = arguments.languagesCategory
             apiEnvironment.layer = NSNumber(value: Int(serialization.currentLayer()))
             apiEnvironment.disableUpdates = supplementary
+            apiEnvironment.appVersion = arguments.appVersion
+            print("[LightGram Network] Initialized MTApiEnvironment with apiId=\(arguments.apiId), appVersion=\(arguments.appVersion), langPack=\(arguments.languagesCategory)")
             apiEnvironment = apiEnvironment.withUpdatedLangPackCode(languageCode ?? "en")
             
             if let effectiveActiveServer = proxySettings?.effectiveActiveServer {
@@ -1214,6 +1216,7 @@ public final class Network: NSObject {
                 updateNetwork = (current != nil) != (updated != nil)
             }
             if updateNetwork {
+                print("[LightGram Network] Proxy settings updated (active: \(updated != nil), port: \(updated?.port ?? 0))")
                 self.dropConnectionStatus()
                 return environment?.withUpdatedSocksProxySettings(updated)
             } else {

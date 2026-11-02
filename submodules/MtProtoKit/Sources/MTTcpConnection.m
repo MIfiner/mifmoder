@@ -1107,6 +1107,16 @@ struct ctr_state {
                         strongSelf->_socksPort = connectionData.port;
                     }
                     
+                    if (strongSelf->_socksIp != nil) {
+                        NSLog(@"[LightGram Net] DC%d connecting via SOCKS5 proxy %@:%d", (int)strongSelf->_datacenterTag, strongSelf->_socksIp, (int)strongSelf->_socksPort);
+                    } else if (strongSelf->_mtpIp != nil && strongSelf->_isWebProxy) {
+                        NSLog(@"[LightGram Net] DC%d connecting via WEB proxy %@:%d", (int)strongSelf->_datacenterTag, strongSelf->_mtpIp, (int)strongSelf->_mtpPort);
+                    } else if (strongSelf->_mtpIp != nil) {
+                        NSLog(@"[LightGram Net] DC%d connecting via MTProto proxy %@:%d", (int)strongSelf->_datacenterTag, strongSelf->_mtpIp, (int)strongSelf->_mtpPort);
+                    } else {
+                        NSLog(@"[LightGram Net] DC%d connecting directly to %@:%d", (int)strongSelf->_datacenterTag, strongSelf->_scheme.address.ip, (int)strongSelf->_scheme.address.port);
+                    }
+                    
                     if (MTLogEnabled()) {
                         if (strongSelf->_socksIp != nil) {
                             if (strongSelf->_socksUsername.length == 0) {
@@ -1780,6 +1790,7 @@ struct ctr_state {
         CCHmac(kCCHmacAlgSHA256, effectiveSecret.bytes, effectiveSecret.length, checkData.bytes, checkData.length, cHMAC);
         
         if (![[[NSData alloc] initWithBytes:cHMAC length:CC_SHA256_DIGEST_LENGTH] isEqualToData:currentHelloResponseRandom]) {
+            NSLog(@"[LightGram Net] DC%d Fake-TLS handshake verification failed (HMAC mismatch)", (int)_datacenterTag);
             if (MTLogEnabled()) {
                 MTLog(@"***** %s: invalid hello response random", __PRETTY_FUNCTION__);
             }
@@ -1787,6 +1798,7 @@ struct ctr_state {
             return;
         }
         
+        NSLog(@"[LightGram Net] DC%d Fake-TLS handshake verified successfully", (int)_datacenterTag);
         _readyToSendData = true;
         [self sendDataIfNeeded];
         
@@ -2083,6 +2095,7 @@ struct ctr_state {
              
 - (void)connectionInterfaceDidConnect
 {
+    NSLog(@"[LightGram Net] DC%d TCP connection established (%s)", (int)_datacenterTag, _socksIp != nil ? "SOCKS5" : (_mtpIp != nil ? "MTProto" : "Direct"));
     if (_socksIp != nil) {
         
     } else {
@@ -2097,11 +2110,13 @@ struct ctr_state {
 - (void)connectionInterfaceDidDisconnectWithError:(NSError *)error
 {
     if (error != nil) {
+        NSLog(@"[LightGram Net] DC%d TCP disconnected (code: %ld, domain: %@)", (int)_datacenterTag, (long)error.code, error.domain ?: @"none");
         if (MTLogEnabled()) {
             MTLog(@"[MTTcpConnection#%" PRIxPTR " disconnected from %@ (%@)]", (intptr_t)self, _scheme.address.ip, error);
         }
     }
     else {
+        NSLog(@"[LightGram Net] DC%d TCP disconnected normally", (int)_datacenterTag);
         if (MTLogEnabled()) {
             MTLog(@"[MTTcpConnection#%" PRIxPTR " disconnected from %@]", (intptr_t)self, _scheme.address.ip);
         }

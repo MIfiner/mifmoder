@@ -273,6 +273,7 @@ typedef enum {
 - (void)fail:(MTProto *)mtProto
 {
     _failureCount += 1;
+    NSLog(@"[LightGram Net] DC%ld auth handshake step failed (attempt %d, stage %d)", (long)mtProto.datacenterId, (int)_failureCount, (int)_stage);
     [_retryTimer invalidate];
     _retryTimer = nil;
     
@@ -544,6 +545,7 @@ static NSData *encryptRSAModernPadding(id<EncryptionProvider> encryptionProvider
     if (_stage == MTDatacenterAuthStagePQ && [message.body isKindOfClass:[MTResPqMessage class]])
     {
         MTResPqMessage *resPqMessage = message.body;
+        NSLog(@"[LightGram Net] DC%ld received resPQ (fingerprints count: %lu)", (long)mtProto.datacenterId, (unsigned long)resPqMessage.serverPublicKeyFingerprints.count);
         
         if ([_nonce isEqualToData:resPqMessage.nonce])
         {
@@ -627,6 +629,7 @@ static NSData *encryptRSAModernPadding(id<EncryptionProvider> encryptionProvider
                 _dhQ = qBytes;
                 
                 _dhPublicKeyFingerprint = [publicKey fingerprintWithEncryptionProvider:_encryptionProvider];
+                NSLog(@"[LightGram Net] DC%ld selected public key fingerprint: 0x%llx", (long)mtProto.datacenterId, (unsigned long long)_dhPublicKeyFingerprint);
                 
                 uint8_t nonceBytes[32];
                 if (SecRandomCopyBytes(kSecRandomDefault, 32, nonceBytes) != errSecSuccess) {
@@ -655,6 +658,7 @@ static NSData *encryptRSAModernPadding(id<EncryptionProvider> encryptionProvider
                 if (_dhEncryptedData == nil) {
                     [self fail:mtProto];
                 } else {
+                    NSLog(@"[LightGram Net] DC%ld inner data encrypted, sent req_DH_params", (long)mtProto.datacenterId);
                     _stage = MTDatacenterAuthStageReqDH;
                     _currentStageMessageId = 0;
                     _currentStageMessageSeqNo = 0;
@@ -672,6 +676,7 @@ static NSData *encryptRSAModernPadding(id<EncryptionProvider> encryptionProvider
         {
             if ([serverDhParamsMessage isKindOfClass:[MTServerDhParamsOkMessage class]])
             {
+                NSLog(@"[LightGram Net] DC%ld received server_DH_params_ok, verifying DH params", (long)mtProto.datacenterId);
                 NSMutableData *tmpAesKey = [[NSMutableData alloc] init];
                 
                 NSMutableData *newNonceAndServerNonce = [[NSMutableData alloc] init];
@@ -900,6 +905,7 @@ static NSData *encryptRSAModernPadding(id<EncryptionProvider> encryptionProvider
                     return;
                 }
                 
+                NSLog(@"[LightGram Net] DC%ld DH params verified, sent set_client_DH_params", (long)mtProto.datacenterId);
                 _stage = MTDatacenterAuthStageKeyVerification;
                 _currentStageMessageId = 0;
                 _currentStageMessageSeqNo = 0;
@@ -959,6 +965,7 @@ static NSData *encryptRSAModernPadding(id<EncryptionProvider> encryptionProvider
                 }
                 else
                 {
+                    NSLog(@"[LightGram Net] DC%ld received dh_gen_ok, DH exchange completed successfully (tempAuth: %s)", (long)mtProto.datacenterId, _tempAuth ? "YES" : "NO");
                     _stage = MTDatacenterAuthStageDone;
                     _currentStageMessageId = 0;
                     _currentStageMessageSeqNo = 0;

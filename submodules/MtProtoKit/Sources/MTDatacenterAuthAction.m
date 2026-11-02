@@ -87,6 +87,7 @@
         if (alreadyCompleted) {
             [self complete];
         } else {
+            NSLog(@"[LightGram Net] DC%ld starting auth action (selector: %d, cdn: %s)", (long)_datacenterId, (int)_authKeyInfoSelector, _isCdn ? "YES" : "NO");
             _authMtProto = [[MTProto alloc] initWithContext:context datacenterId:_datacenterId usageCalculationInfo:nil requiredAuthToken:nil authTokenMasterDatacenterId:0];
             _authMtProto.cdn = _isCdn;
             _authMtProto.useUnauthorizedMode = true;
@@ -121,6 +122,10 @@
 }
 
 - (void)completeWithAuthKey:(MTDatacenterAuthKey *)authKey timestamp:(int64_t)timestamp serverSalt:(int64_t)serverSalt {
+    if (atomic_load(&_cancelled)) {
+        return;
+    }
+    NSLog(@"[LightGram Net] DC%ld auth action completed with auth key (selector: %d)", (long)_datacenterId, (int)_authKeyInfoSelector);
     if (MTLogEnabled()) {
         MTLog(@"[MTDatacenterAuthAction#%p@%p: completeWithAuthKey %lld selector %d]", self, _context, authKey.authKeyId, _authKeyInfoSelector);
     }
@@ -245,6 +250,10 @@
 }
 
 - (void)completeWithBoundAuthKey:(MTDatacenterAuthKey *)authKey timestamp:(int64_t)timestamp serverSalt:(int64_t)serverSalt {
+    if (atomic_load(&_cancelled)) {
+        return;
+    }
+    NSLog(@"[LightGram Net] DC%ld ephemeral auth key bound successfully (selector: %d)", (long)_datacenterId, (int)_authKeyInfoSelector);
     if (self.probedPermanentKey == nil) {
         MTDatacenterAuthInfo *authInfo = [[MTDatacenterAuthInfo alloc] initWithAuthKey:authKey.authKey authKeyId:authKey.authKeyId validUntilTimestamp:authKey.validUntilTimestamp saltSet:@[[[MTDatacenterSaltInfo alloc] initWithSalt:serverSalt firstValidMessageId:timestamp lastValidMessageId:timestamp + (29.0 * 60.0) * 4294967296]] authKeyAttributes:nil];
         
@@ -273,10 +282,14 @@
 - (void)cancel
 {
     atomic_store(&_cancelled, true);
+    NSLog(@"[LightGram Net] DC%ld auth action cancelled", (long)_datacenterId);
     [self cleanup];
 }
 
 - (void)complete {
+    if (atomic_load(&_cancelled)) {
+        return;
+    }
     if (_completion) {
         _completion(self, true);
     }
@@ -284,6 +297,10 @@
 
 - (void)fail
 {
+    if (atomic_load(&_cancelled)) {
+        return;
+    }
+    NSLog(@"[LightGram Net] DC%ld auth action failed (selector: %d, bindError: %ld)", (long)_datacenterId, (int)_authKeyInfoSelector, (long)_bindError.errorCode);
     if (_completion) {
         _completion(self, false);
     }
