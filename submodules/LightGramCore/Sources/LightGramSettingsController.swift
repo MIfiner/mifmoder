@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import Display
 import AsyncDisplayKit
+import TelegramCore
 
 public final class LightGramSettingsController: ViewController, UITableViewDataSource, UITableViewDelegate {
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
@@ -145,7 +146,7 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         case .spyMode: return 5
         case .privacyAndSecurity: return 2
         case .smartFilters: return 1
-        case .tools: return 1
+        case .tools: return 2
         }
     }
     
@@ -254,8 +255,14 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
             cell.accessoryView = sw
             
         case .tools:
-            cell.textLabel?.text = "Group & Bot Tools"
-            cell.accessoryType = .disclosureIndicator
+            if indexPath.row == 0 {
+                cell.textLabel?.text = "Group & Bot Tools"
+                cell.accessoryType = .disclosureIndicator
+            } else {
+                cell.textLabel?.text = "Network Diagnostics"
+                cell.detailTextLabel?.text = "NWConnection / DC 2"
+                cell.accessoryType = .disclosureIndicator
+            }
         }
         
         return cell
@@ -280,9 +287,42 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         if s == .spyMode && indexPath.row == 3 {
             let archiveVC = LightGramSpyArchiveController()
             self.push(archiveVC)
-        } else if s == .tools && indexPath.row == 0 {
-            let toolsVC = LightGramToolsController()
-            self.push(toolsVC)
+        } else if s == .tools {
+            if indexPath.row == 0 {
+                let toolsVC = LightGramToolsController()
+                self.push(toolsVC)
+            } else if indexPath.row == 1 {
+                self.showNetworkDiagnostics()
+            }
         }
+    }
+    
+    private func showNetworkDiagnostics() {
+        let appVersion = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0"
+        let logLines = Logger.shared.getRecentLogLines()
+        let report = """
+        === LightGram V1 Network Diagnostics ===
+        App Version: \(appVersion)
+        iOS: \(UIDevice.current.systemVersion)
+        Active Transport: Network.framework (NWConnection)
+        DC 2: 149.154.167.50:443
+        DC 1: 149.154.175.50:443
+        DC 4: 149.154.167.91:443
+        
+        Recent Logs (\(logLines.count) lines):
+        \(logLines.suffix(60).joined(separator: "\n"))
+        """
+        
+        let alert = UIAlertController(title: "Network Diagnostics", message: "Live MTProto & Transport status:", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Copy Full Report", style: .default, handler: { _ in
+            UIPasteboard.general.string = report
+        }))
+        alert.addAction(UIAlertAction(title: "Share", style: .default, handler: { [weak self] _ in
+            guard let self = self else { return }
+            let activity = UIActivityViewController(activityItems: [report], applicationActivities: nil)
+            self.present(activity, animated: true, completion: nil)
+        }))
+        alert.addAction(UIAlertAction(title: "Close", style: .cancel, handler: nil))
+        self.present(alert, animated: true, completion: nil)
     }
 }

@@ -504,6 +504,9 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         super.didLoad()
         
         self.titleNode.view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.debugTap(_:))))
+        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(self.debugLongPress(_:)))
+        longPress.minimumPressDuration = 1.0
+        self.titleNode.view.addGestureRecognizer(longPress)
         #if DEBUG && false
         self.noticeNode.view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.debugQrTap(_:))))
         #endif
@@ -702,11 +705,17 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
                 self.debugTapCounter.1 += 1
             }
             
-            if self.debugTapCounter.1 >= 10 {
+            if self.debugTapCounter.1 >= 5 {
                 self.debugTapCounter.1 = 0
                 
                 self.debugAction()
             }
+        }
+    }
+    
+    @objc private func debugLongPress(_ recognizer: UILongPressGestureRecognizer) {
+        if case .began = recognizer.state {
+            self.debugAction()
         }
     }
     

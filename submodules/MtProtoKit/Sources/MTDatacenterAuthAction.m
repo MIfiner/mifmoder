@@ -88,6 +88,7 @@
             [self complete];
         } else {
             NSLog(@"[LightGram Net] DC%ld starting auth action (selector: %d, cdn: %s)", (long)_datacenterId, (int)_authKeyInfoSelector, _isCdn ? "YES" : "NO");
+            MTLog(@"[LightGram Net] DC%ld starting auth action (selector: %d, cdn: %s)", (long)_datacenterId, (int)_authKeyInfoSelector, _isCdn ? "YES" : "NO");
             _authMtProto = [[MTProto alloc] initWithContext:context datacenterId:_datacenterId usageCalculationInfo:nil requiredAuthToken:nil authTokenMasterDatacenterId:0];
             _authMtProto.cdn = _isCdn;
             _authMtProto.useUnauthorizedMode = true;
@@ -126,6 +127,7 @@
         return;
     }
     NSLog(@"[LightGram Net] DC%ld auth action completed with auth key (selector: %d)", (long)_datacenterId, (int)_authKeyInfoSelector);
+    MTLog(@"[LightGram Net] DC%ld auth action completed with auth key (selector: %d)", (long)_datacenterId, (int)_authKeyInfoSelector);
     if (MTLogEnabled()) {
         MTLog(@"[MTDatacenterAuthAction#%p@%p: completeWithAuthKey %lld selector %d]", self, _context, authKey.authKeyId, _authKeyInfoSelector);
     }

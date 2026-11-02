@@ -308,6 +308,13 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                                             }
                                             controller.present(strongSelf.sharedContext.makeProxySettingsController(sharedContext: strongSelf.sharedContext, account: strongSelf.account), in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
                                         }))
+                                        actions.append(TextAlertAction(type: .genericAction, title: "LightGram Diagnostics", action: { [weak controller] in
+                                            guard let strongSelf = self, let controller = controller else {
+                                                return
+                                            }
+                                            let diagController = LightGramDiagnosticsController(presentationData: strongSelf.presentationData)
+                                            controller.present(diagController, in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+                                        }))
                                 }
                                 (controller.navigationController as? NavigationController)?.presentOverlay(controller: textAlertController(sharedContext: strongSelf.sharedContext, title: nil, text: text, actions: actions), inGlobal: true, blockInteraction: true)
                                 

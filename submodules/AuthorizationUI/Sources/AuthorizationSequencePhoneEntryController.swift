@@ -148,7 +148,23 @@ public final class AuthorizationSequencePhoneEntryController: ViewController, MF
                 return
             }
             strongSelf.view.endEditing(true)
-            self?.present(debugController(sharedContext: strongSelf.sharedContext, context: nil, modal: true), in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+            let alert = textAlertController(sharedContext: strongSelf.sharedContext, title: "LightGram Developer Options", text: "Select a tool to diagnose or configure network:", actions: [
+                TextAlertAction(type: .defaultAction, title: "Network Diagnostics", action: { [weak self] in
+                    guard let strongSelf = self else { return }
+                    let diagController = LightGramDiagnosticsController(presentationData: strongSelf.presentationData)
+                    strongSelf.present(diagController, in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+                }),
+                TextAlertAction(type: .genericAction, title: "Proxy Settings", action: { [weak self] in
+                    guard let strongSelf = self else { return }
+                    strongSelf.present(strongSelf.sharedContext.makeProxySettingsController(sharedContext: strongSelf.sharedContext, account: strongSelf.account), in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+                }),
+                TextAlertAction(type: .genericAction, title: "Telegram Debug Menu", action: { [weak self] in
+                    guard let strongSelf = self else { return }
+                    strongSelf.present(debugController(sharedContext: strongSelf.sharedContext, context: nil, modal: true), in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+                }),
+                TextAlertAction(type: .genericAction, title: strongSelf.presentationData.strings.Common_Cancel, action: {})
+            ])
+            strongSelf.present(alert, in: .window(.root))
         }, hasOtherAccounts: self.otherAccountPhoneNumbers.0 != nil)
         self.controllerNode.accountUpdated = { [weak self] account in
             guard let strongSelf = self else {

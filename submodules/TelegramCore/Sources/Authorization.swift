@@ -193,13 +193,16 @@ public func sendAuthorizationCode(accountManager: AccountManager<TelegramAccount
         }
         
         print("[LightGram Network] sendAuthorizationCode: initiating request to master DC \(account.masterDatacenterId)...")
+        Logger.shared.log("LightGram Network", "sendAuthorizationCode: initiating request to master DC \(account.masterDatacenterId)...")
         let codeAndAccount = account.network.request(sendCode, automaticFloodWait: false)
         |> map { result -> (SendCodeResult, UnauthorizedAccount) in
             print("[LightGram Network] sendAuthorizationCode received response from master DC \(account.masterDatacenterId)")
+            Logger.shared.log("LightGram Network", "sendAuthorizationCode received response from master DC \(account.masterDatacenterId)")
             return (.sentCode(result), account)
         }
         |> `catch` { error -> Signal<(SendCodeResult, UnauthorizedAccount), MTRpcError> in
             print("[LightGram Network] sendAuthorizationCode RPC error: code=\(error.errorCode) desc=\(error.errorDescription ?? "none")")
+            Logger.shared.log("LightGram Network", "sendAuthorizationCode RPC error: code=\(error.errorCode) desc=\(error.errorDescription ?? "none")")
             switch MatchString(error.errorDescription ?? "") {
                 case Regex("(PHONE_|USER_|NETWORK_)MIGRATE_(\\d+)"):
                     let range = error.errorDescription.range(of: "MIGRATE_")!

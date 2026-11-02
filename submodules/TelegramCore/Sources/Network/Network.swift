@@ -596,21 +596,23 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
             let context = MTContext(serialization: serialization, encryptionProvider: arguments.encryptionProvider, apiEnvironment: apiEnvironment, isTestingEnvironment: testingEnvironment, useTempAuthKeys: useTempAuthKeys)
             context.refreshesTemporaryKeys = !supplementary
             
-            if let networkSettings = networkSettings {
-                let useNetworkFramework: Bool
-                if let customValue = networkSettings.useNetworkFramework {
-                    useNetworkFramework = customValue
-                } else if arguments.useBetaFeatures {
-                    useNetworkFramework = false
-                } else {
-                    useNetworkFramework = false
-                }
-                
-                if useNetworkFramework {
-                    if #available(iOS 12.0, macOS 14.0, *) {
-                        context.makeTcpConnectionInterface = { delegate, delegateQueue in
-                            return NetworkFrameworkTcpConnectionInterface(delegate: delegate, delegateQueue: delegateQueue)
-                        }
+            let effectiveNetworkSettings = networkSettings ?? NetworkSettings.defaultSettings
+            let useNetworkFramework: Bool
+            if let customValue = effectiveNetworkSettings.useNetworkFramework {
+                useNetworkFramework = customValue
+            } else {
+                // Apple Network.framework (NWConnection) is required on iOS 12+ (and essential on iOS 18)
+                // for sideloaded/sandboxed apps to prevent POSIX BSD socket kernel stalls and connection timeouts.
+                useNetworkFramework = true
+            }
+            
+            print("[LightGram Network] Network.framework TCP enabled: \(useNetworkFramework)")
+            Logger.shared.log("LightGram Network", "Network.framework TCP enabled: \(useNetworkFramework)")
+            
+            if useNetworkFramework {
+                if #available(iOS 12.0, macOS 14.0, *) {
+                    context.makeTcpConnectionInterface = { delegate, delegateQueue in
+                        return NetworkFrameworkTcpConnectionInterface(delegate: delegate, delegateQueue: delegateQueue)
                     }
                 }
             }

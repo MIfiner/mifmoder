@@ -201,6 +201,7 @@ final class NetworkFrameworkTcpConnectionInterface: NSObject, MTTcpConnectionInt
             self.connectTimeoutTimer?.start()
             
             Logger.shared.log("NWTcp", "\(self.logId) starting connection (timeout: \(timeout)s)")
+            Logger.shared.log("LightGram Net", "[NetworkFramework] \(self.logId) dialing (timeout: \(timeout)s)")
             
             connection.start(queue: self.queue.queue)
             
@@ -217,9 +218,11 @@ final class NetworkFrameworkTcpConnectionInterface: NSObject, MTTcpConnectionInt
             }
             
             Logger.shared.log("NWTcp", "\(self.logId) state: \(describeState(state))")
+            Logger.shared.log("LightGram Net", "[NetworkFramework] \(self.logId) state: \(describeState(state))")
             
             switch state {
             case .ready:
+                Logger.shared.log("LightGram Net", "[NetworkFramework] \(self.logId) connection is READY")
                 if let path = self.connection?.currentPath {
                     if path.usesInterfaceType(.cellular) {
                         self.currentInterfaceIsWifi = false
@@ -240,6 +243,7 @@ final class NetworkFrameworkTcpConnectionInterface: NSObject, MTTcpConnectionInt
                     }
                 }
             case let .failed(error):
+                Logger.shared.log("LightGram Net", "[NetworkFramework] \(self.logId) connection failed: \(error)")
                 self.cancelWithError(error: error, reason: "connection failed")
             default:
                 break
@@ -402,6 +406,7 @@ final class NetworkFrameworkTcpConnectionInterface: NSObject, MTTcpConnectionInt
             if !self.reportedDisconnection {
                 self.reportedDisconnection = true
                 Logger.shared.log("NWTcp", "\(self.logId) reporting disconnection: \(reason)\(errorSuffix)")
+                Logger.shared.log("LightGram Net", "[NetworkFramework] \(self.logId) disconnected: \(reason)\(errorSuffix)")
                 let delegate = self.delegate
                 self.delegateQueue.async { [weak delegate] in
                     if let delegate = delegate {

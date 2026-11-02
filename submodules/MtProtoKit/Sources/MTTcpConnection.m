@@ -1109,12 +1109,16 @@ struct ctr_state {
                     
                     if (strongSelf->_socksIp != nil) {
                         NSLog(@"[LightGram Net] DC%d connecting via SOCKS5 proxy %@:%d", (int)strongSelf->_datacenterTag, strongSelf->_socksIp, (int)strongSelf->_socksPort);
+                        MTLog(@"[LightGram Net] DC%d connecting via SOCKS5 proxy %@:%d", (int)strongSelf->_datacenterTag, strongSelf->_socksIp, (int)strongSelf->_socksPort);
                     } else if (strongSelf->_mtpIp != nil && strongSelf->_isWebProxy) {
                         NSLog(@"[LightGram Net] DC%d connecting via WEB proxy %@:%d", (int)strongSelf->_datacenterTag, strongSelf->_mtpIp, (int)strongSelf->_mtpPort);
+                        MTLog(@"[LightGram Net] DC%d connecting via WEB proxy %@:%d", (int)strongSelf->_datacenterTag, strongSelf->_mtpIp, (int)strongSelf->_mtpPort);
                     } else if (strongSelf->_mtpIp != nil) {
                         NSLog(@"[LightGram Net] DC%d connecting via MTProto proxy %@:%d", (int)strongSelf->_datacenterTag, strongSelf->_mtpIp, (int)strongSelf->_mtpPort);
+                        MTLog(@"[LightGram Net] DC%d connecting via MTProto proxy %@:%d", (int)strongSelf->_datacenterTag, strongSelf->_mtpIp, (int)strongSelf->_mtpPort);
                     } else {
                         NSLog(@"[LightGram Net] DC%d connecting directly to %@:%d", (int)strongSelf->_datacenterTag, strongSelf->_scheme.address.ip, (int)strongSelf->_scheme.address.port);
+                        MTLog(@"[LightGram Net] DC%d connecting directly to %@:%d", (int)strongSelf->_datacenterTag, strongSelf->_scheme.address.ip, (int)strongSelf->_scheme.address.port);
                     }
                     
                     if (MTLogEnabled()) {
@@ -2096,6 +2100,7 @@ struct ctr_state {
 - (void)connectionInterfaceDidConnect
 {
     NSLog(@"[LightGram Net] DC%d TCP connection established (%s)", (int)_datacenterTag, _socksIp != nil ? "SOCKS5" : (_mtpIp != nil ? "MTProto" : "Direct"));
+    MTLog(@"[LightGram Net] DC%d TCP connection established (%s)", (int)_datacenterTag, _socksIp != nil ? "SOCKS5" : (_mtpIp != nil ? "MTProto" : "Direct"));
     if (_socksIp != nil) {
         
     } else {
@@ -2111,12 +2116,14 @@ struct ctr_state {
 {
     if (error != nil) {
         NSLog(@"[LightGram Net] DC%d TCP disconnected (code: %ld, domain: %@)", (int)_datacenterTag, (long)error.code, error.domain ?: @"none");
+        MTLog(@"[LightGram Net] DC%d TCP disconnected (code: %ld, domain: %@)", (int)_datacenterTag, (long)error.code, error.domain ?: @"none");
         if (MTLogEnabled()) {
             MTLog(@"[MTTcpConnection#%" PRIxPTR " disconnected from %@ (%@)]", (intptr_t)self, _scheme.address.ip, error);
         }
     }
     else {
         NSLog(@"[LightGram Net] DC%d TCP disconnected normally", (int)_datacenterTag);
+        MTLog(@"[LightGram Net] DC%d TCP disconnected normally", (int)_datacenterTag);
         if (MTLogEnabled()) {
             MTLog(@"[MTTcpConnection#%" PRIxPTR " disconnected from %@]", (intptr_t)self, _scheme.address.ip);
         }

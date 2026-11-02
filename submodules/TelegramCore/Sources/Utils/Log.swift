@@ -83,6 +83,34 @@ public final class Logger {
     private var file: (ManagedFile, Int)?
     private var shortFile: (ManagedFile, Int)?
     
+    private let logBufferLock = NSLock()
+    private var inMemoryLogs: [String] = []
+    private let maxInMemoryLogs = 500
+    
+    public func getRecentLogLines() -> [String] {
+        self.logBufferLock.lock()
+        defer { self.logBufferLock.unlock() }
+        return self.inMemoryLogs
+    }
+    
+    public func addDiagnosticLog(_ message: String) {
+        var rawTime = time_t()
+        time(&rawTime)
+        var timeinfo = tm()
+        localtime_r(&rawTime, &timeinfo)
+        var curTime = timeval()
+        gettimeofday(&curTime, nil)
+        let milliseconds = curTime.tv_usec / 1000
+        let content = String(format: "[LightGram Net] %d-%d-%d %02d:%02d:%02d.%03d %@", arguments: [Int(timeinfo.tm_year) + 1900, Int(timeinfo.tm_mon + 1), Int(timeinfo.tm_mday), Int(timeinfo.tm_hour), Int(timeinfo.tm_min), Int(timeinfo.tm_sec), Int(milliseconds), message])
+        print(content)
+        self.logBufferLock.lock()
+        self.inMemoryLogs.append(content)
+        if self.inMemoryLogs.count > self.maxInMemoryLogs {
+            self.inMemoryLogs.removeFirst(self.inMemoryLogs.count - self.maxInMemoryLogs)
+        }
+        self.logBufferLock.unlock()
+    }
+    
     public var logToFile: Bool = true {
         didSet {
             let oldEnabled = self.logToConsole || oldValue
@@ -299,11 +327,18 @@ public final class Logger {
         let milliseconds = curTime.tv_usec / 1000
         
         var consoleContent: String?
+        let formattedLog = String(format: "[%@] %d-%d-%d %02d:%02d:%02d.%03d %@", arguments: [tag, Int(timeinfo.tm_year) + 1900, Int(timeinfo.tm_mon + 1), Int(timeinfo.tm_mday), Int(timeinfo.tm_hour), Int(timeinfo.tm_min), Int(timeinfo.tm_sec), Int(milliseconds), string])
         if self.logToConsole {
-            let content = String(format: "[%@] %d-%d-%d %02d:%02d:%02d.%03d %@", arguments: [tag, Int(timeinfo.tm_year) + 1900, Int(timeinfo.tm_mon + 1), Int(timeinfo.tm_mday), Int(timeinfo.tm_hour), Int(timeinfo.tm_min), Int(timeinfo.tm_sec), Int(milliseconds), string])
-            consoleContent = content
-            print(content)
+            consoleContent = formattedLog
+            print(formattedLog)
         }
+        
+        self.logBufferLock.lock()
+        self.inMemoryLogs.append(formattedLog)
+        if self.inMemoryLogs.count > self.maxInMemoryLogs {
+            self.inMemoryLogs.removeFirst(self.inMemoryLogs.count - self.maxInMemoryLogs)
+        }
+        self.logBufferLock.unlock()
         
         if self.logToFile {
             self.queue.async {
