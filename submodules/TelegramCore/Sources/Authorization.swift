@@ -409,7 +409,7 @@ public func sendAuthorizationCode(accountManager: AccountManager<TelegramAccount
                         Logger.shared.log("LightGram Auth", "(Stage 6/7) sentCode: type=\(parsedType) timeout=\(codeTimeout ?? 0)")
                     case let .sentCodePaymentRequired(sentCodePaymentRequiredData):
                         let (storeProduct, codeHash, supportEmailAddress, supportEmailSubject, premiumDays) = (sentCodePaymentRequiredData.storeProduct, sentCodePaymentRequiredData.phoneCodeHash, sentCodePaymentRequiredData.supportEmailAddress, sentCodePaymentRequiredData.supportEmailSubject, sentCodePaymentRequiredData.premiumDays)
-                        Logger.shared.log("LightGram Auth", "(Stage 6/7) sentCodePaymentRequired: product=\(storeProduct ?? "nil") days=\(premiumDays ?? 0)")
+                        Logger.shared.log("LightGram Auth", "(Stage 6/7) sentCodePaymentRequired: product=\(storeProduct) days=\(premiumDays)")
                         transaction.setState(UnauthorizedAccountState(isTestingEnvironment: account.testingEnvironment, masterDatacenterId: account.masterDatacenterId, contents: .payment(number: phoneNumber, codeHash: codeHash, storeProduct: storeProduct, premiumDays: premiumDays, supportEmailAddress: supportEmailAddress, supportEmailSubject: supportEmailSubject, syncContacts: syncContacts)))
                         return .single(.sentCode(account))
                     case let .sentCodeSuccess(sentCodeSuccessData):

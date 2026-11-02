@@ -95,10 +95,12 @@ def build_configuration_from_json(path):
         require_prod = os.environ.get('REQUIRE_PRODUCTION_CREDENTIALS', '').lower() in ['1', 'true', 'yes'] or \
                        os.environ.get('LIGHTGRAM_REQUIRE_PRODUCTION_CREDENTIALS', '').lower() in ['1', 'true', 'yes']
         current_api_id = str(configuration_dict.get('api_id', '')).strip()
-        is_sample_or_missing = not current_api_id or current_api_id in ['8', '0']
+        current_api_hash = str(configuration_dict.get('api_hash', '')).strip()
+        is_sample_or_missing = not current_api_id or current_api_id in ['8', '0'] or \
+                               not current_api_hash or current_api_hash in ['7245de8e747a0d6fbe11f7cc14fcc0bb']
 
         if require_prod and is_sample_or_missing:
-            print('ERROR: Production credentials are required, but api_id is missing or set to sample ID 8.')
+            print('ERROR: Production credentials are required, but api_id or api_hash is missing or set to sample values.')
             print('Please supply valid api_id and api_hash via LIGHTGRAM_API_ID / LIGHTGRAM_API_HASH or in lightgram-credentials.json.')
             sys.exit(1)
 
