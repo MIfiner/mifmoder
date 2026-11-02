@@ -213,6 +213,7 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                             }
                             return (ApplicationSpecificNotice.forcedPasswordSetupKey(), entry)
                         }) |> deliverOnMainQueue).startStrict(next: { [weak self] result in
+                            print("[LightGram Network] sendAuthorizationCode succeeded, transitioning UI")
                             if let strongSelf = self {
                                 switch result {
                                 case let .sentCode(account):
@@ -224,6 +225,7 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                                 }
                             }
                         }, error: { error in
+                            print("[LightGram Network] sendAuthorizationCode failed with error: \(error)")
                             if let strongSelf = self, let controller = controller {
                                 controller.inProgress = false
                                 

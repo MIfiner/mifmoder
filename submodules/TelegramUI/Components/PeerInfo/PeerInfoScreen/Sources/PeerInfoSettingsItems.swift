@@ -354,6 +354,7 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
     items[.support]!.append(PeerInfoScreenDisclosureItem(id: 2, text: presentationData.strings.Settings_Tips, icon: PresentationResourcesSettings.tips, action: {
         interaction.openSettings(.tips)
     }))
+    items[.support]!.append(PeerInfoScreenCommentItem(id: 9999, text: "LightGram for iOS v1.0 (Build 131906)\nBased on Telegram MTProto"))
     
     var result: [(AnyHashable, [PeerInfoScreenItem])] = []
     for section in SettingsSection.allCases {

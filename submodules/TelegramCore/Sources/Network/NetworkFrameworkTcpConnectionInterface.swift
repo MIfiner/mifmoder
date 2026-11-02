@@ -135,7 +135,7 @@ final class NetworkFrameworkTcpConnectionInterface: NSObject, MTTcpConnectionInt
             tcpOptions.keepaliveIdle = 5
             tcpOptions.keepaliveCount = 2
             tcpOptions.keepaliveInterval = 5
-            tcpOptions.enableFastOpen = true
+            tcpOptions.enableFastOpen = false
             
             let parameters = NWParameters(tls: nil, tcp: tcpOptions)
             // nw_parameters_set_prefer_no_proxy defaults to false, so Network.framework routes

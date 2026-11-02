@@ -152,6 +152,14 @@ jobs:
             echo "CODESIGNING_PATH=build-system/fake-codesigning" >> $GITHUB_ENV
           fi
 
+      - name: Cache Bazel disk cache
+        uses: actions/cache@v4
+        with:
+          path: /private/var/tmp/bazel-disk-cache
+          key: bazel-disk-cache-${{ runner.os }}-${{ hashFiles('versions.json', 'submodules/**/BUILD', 'Telegram/BUILD') }}
+          restore-keys: |
+            bazel-disk-cache-${{ runner.os }}-
+
       - name: Build LightGram V1 via Bazel
         env:
           INPUT_CONFIGURATION: ${{ inputs.configuration }}
@@ -160,6 +168,7 @@ jobs:
 
           CONFIG="${INPUT_CONFIGURATION:-release_arm64}"
           BAZEL_USER_ROOT="/private/var/tmp/_bazel_containerhost"
+          mkdir -p /private/var/tmp/bazel-disk-cache
           BUILD_OFFSET=100000
           COMMIT_COUNT=$(git rev-list --count HEAD 2>/dev/null || echo 1)
           BUILD_NUMBER=$((COMMIT_COUNT + BUILD_OFFSET))
@@ -174,6 +183,7 @@ jobs:
             --overrideXcodeVersion \
             --overrideBazelVersion \
             --bazelUserRoot="$BAZEL_USER_ROOT" \
+            --cacheDir="/private/var/tmp/bazel-disk-cache" \
             build \
             --configurationPath="build-system/lightgram-configuration.json" \
             --codesigningInformationPath="$CODESIGNING_PATH" \

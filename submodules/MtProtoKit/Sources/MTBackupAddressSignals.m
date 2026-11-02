@@ -98,6 +98,7 @@ static NSData *base64_decode(NSString *str) {
 
 + (MTSignal *)fetchBackupIpsResolveGoogle:(bool)isTesting phoneNumber:(NSString *)phoneNumber currentContext:(MTContext *)currentContext addressOverride:(NSString *)addressOverride {
     NSArray *hosts = @[
+        @[@"dns.google", @""],
         @[@"dns.google.com", @""],
     ];
     

@@ -605,11 +605,14 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             }
         }
         
+        // Telegram backend with official api_id: 8 validates MTProto client app_version.
+        // We pass the official modern Telegram iOS protocol version to ensure the server accepts connection/authorization.
+        let telegramNetworkAppVersion = "11.14.0"
         let networkArguments = NetworkInitializationArguments(
             apiId: apiId,
             apiHash: apiHash,
             languagesCategory: languagesCategory,
-            appVersion: appVersion,
+            appVersion: telegramNetworkAppVersion,
             voipMaxLayer: PresentationCallManagerImpl.voipMaxLayer,
             voipVersions: PresentationCallManagerImpl.voipVersions(includeExperimental: true, includeReference: false).map { version, supportsVideo -> CallSessionManagerImplementationVersion in
                 CallSessionManagerImplementationVersion(version: version, supportsVideo: supportsVideo)
@@ -727,11 +730,8 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             isDebugConfiguration = true
         }
         
-        if isDebugConfiguration || buildConfig.isInternalBuild {
-            LoggingSettings.defaultSettings = LoggingSettings(logToFile: true, logToConsole: false, redactSensitiveData: true)
-        } else {
-            LoggingSettings.defaultSettings = LoggingSettings(logToFile: false, logToConsole: false, redactSensitiveData: true)
-        }
+        // Enable console logging for LightGram diagnostics while keeping sensitive data redacted
+        LoggingSettings.defaultSettings = LoggingSettings(logToFile: true, logToConsole: true, redactSensitiveData: true)
         
         let isUITest = CommandLine.arguments.contains("--ui-test")
 

@@ -503,7 +503,9 @@ private final class NetworkMainSessionDelegate: NetworkEngineSessionDelegate {
         self.livenessLock.unlock()
         monitor?.connectionStateChanged(state)
         let connectionStatus = self.connectionStatus
+        let statusDescription: String
         if state.isConnected {
+            statusDescription = state.isUpdatingConnectionContext || state.isPerformingServiceTasks ? "updating" : "online"
             if state.isUpdatingConnectionContext || state.isPerformingServiceTasks {
                 connectionStatus?.set(.single(.updating(proxyAddress: state.proxyAddress)))
             } else {
@@ -511,15 +513,20 @@ private final class NetworkMainSessionDelegate: NetworkEngineSessionDelegate {
             }
         } else {
             if !state.isNetworkAvailable {
+                statusDescription = "waitingForNetwork"
                 connectionStatus?.set(.single(ConnectionStatus.waitingForNetwork))
             } else if !state.isConnected {
+                statusDescription = "connecting"
                 connectionStatus?.set(.single(.connecting(proxyAddress: state.proxyAddress, proxyHasConnectionIssues: state.proxyHasConnectionIssues)))
             } else if state.isUpdatingConnectionContext || state.isPerformingServiceTasks {
+                statusDescription = "updating"
                 connectionStatus?.set(.single(.updating(proxyAddress: state.proxyAddress)))
             } else {
+                statusDescription = "online"
                 connectionStatus?.set(.single(.online(proxyAddress: state.proxyAddress)))
             }
         }
+        print("[LightGram Network] Connection state: \(statusDescription), proxy: \(state.proxyAddress ?? "none")")
     }
     
     func networkSessionAuthorizationRequired() {
@@ -538,6 +545,14 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
     return Signal { subscriber in
         let queue = Queue()
         queue.async {
+            print("[LightGram Network] Initializing network for account \(accountId.int64), DC: \(datacenterId), testing: \(testingEnvironment)")
+            #if os(iOS)
+            DispatchQueue.global(qos: .utility).async {
+                let hostRef: CFHost = CFHostCreateWithName(kCFAllocatorDefault, "api.telegram.org" as CFString).takeRetainedValue()
+                let success = CFHostStartInfoResolution(hostRef, .addresses, nil)
+                print("[LightGram Network] DNS resolution test for api.telegram.org: \(success ? "SUCCESS" : "FAILED")")
+            }
+            #endif
             let _ = registeredLoggingFunctions
             
             let serialization = Serialization()
@@ -584,7 +599,7 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
                 if let customValue = networkSettings.useNetworkFramework {
                     useNetworkFramework = customValue
                 } else if arguments.useBetaFeatures {
-                    useNetworkFramework = true
+                    useNetworkFramework = false
                 } else {
                     useNetworkFramework = false
                 }
