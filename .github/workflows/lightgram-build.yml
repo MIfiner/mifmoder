@@ -87,7 +87,7 @@ jobs:
           cat build-system/lightgram-configuration.json
 
           echo "=== Verifying Bundle ID and Display Name ==="
-          grep -rn "LightGram V1" Telegram/BUILD Telegram/Telegram-iOS/InfoBazel.plist
+          grep -rn "LightGram" Telegram/BUILD Telegram/Telegram-iOS/InfoBazel.plist
 
       - name: Apply secrets if provided
         env:
