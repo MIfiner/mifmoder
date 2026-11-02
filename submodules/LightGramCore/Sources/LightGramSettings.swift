@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import Display
 @_exported import TelegramCore
 
 public extension LightGramSettings {
