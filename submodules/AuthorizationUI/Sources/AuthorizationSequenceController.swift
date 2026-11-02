@@ -225,17 +225,54 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                                 }
                             }
                         }, error: { error in
-                            print("[LightGram Network] sendAuthorizationCode failed with error: \(error)")
+                            Logger.shared.log("LightGram Auth", "(Stage 7/7) sendAuthorizationCode failed with error: \(error)")
                             if let strongSelf = self, let controller = controller {
                                 controller.inProgress = false
                                 
+                                let title: String?
                                 let text: String
                                 var actions: [TextAlertAction] = []
                                 switch error {
+                                    case .apiIdPublishedFlood:
+                                        title = "API ID Restricted"
+                                        text = "Telegram has blocked the sample API ID (8) because it is published publicly (error: API_ID_PUBLISHED_FLOOD).\n\nTo authorize on real devices, supply your personal API credentials from my.telegram.org in GitHub Secrets (LIGHTGRAM_API_ID & LIGHTGRAM_API_HASH)."
+                                        actions.append(TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Common_OK, action: {}))
+                                        actions.append(TextAlertAction(type: .genericAction, title: "Open my.telegram.org", action: {
+                                            strongSelf.sharedContext.applicationBindings.openUrl("https://my.telegram.org")
+                                        }))
+                                        actions.append(TextAlertAction(type: .genericAction, title: "LightGram Diagnostics", action: { [weak controller] in
+                                            guard let strongSelf = self, let controller = controller else {
+                                                return
+                                            }
+                                            let diagController = LightGramDiagnosticsController(presentationData: strongSelf.presentationData, apiId: strongSelf.apiId)
+                                            controller.present(diagController, in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+                                        }))
+                                    case .apiIdInvalid:
+                                        title = "Invalid API Credentials"
+                                        text = "The configured Telegram API ID / API Hash is invalid. Please verify your credentials at my.telegram.org."
+                                        actions.append(TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Common_OK, action: {}))
+                                        actions.append(TextAlertAction(type: .genericAction, title: "Open my.telegram.org", action: {
+                                            strongSelf.sharedContext.applicationBindings.openUrl("https://my.telegram.org")
+                                        }))
+                                    case let .floodWait(seconds):
+                                        title = "Flood Wait"
+                                        let minutes = max(1, seconds / 60)
+                                        text = "Too many login attempts. Telegram server requested a wait time of \(minutes) minute(s) (FLOOD_WAIT_\(seconds)). Please try again later."
+                                        actions.append(TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Common_OK, action: {}))
+                                    case let .paymentRequired(storeProduct, _, _, _):
+                                        title = "Verification Payment Required"
+                                        text = "Telegram requires SMS verification payment for this number (Product: \(storeProduct ?? "SMS"))."
+                                        actions.append(TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Common_OK, action: {}))
+                                    case .signUpRequired:
+                                        title = "Account Not Found"
+                                        text = "This phone number is not registered on Telegram yet. Please register using the official Telegram app first, then log in to LightGram."
+                                        actions.append(TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Common_OK, action: {}))
                                     case .limitExceeded:
+                                        title = nil
                                         text = strongSelf.presentationData.strings.Login_CodeFloodError
                                         actions.append(TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Common_OK, action: {}))
                                     case .invalidPhoneNumber:
+                                        title = nil
                                         text = strongSelf.presentationData.strings.Login_InvalidPhoneError
                                         actions.append(TextAlertAction(type: .genericAction, title: strongSelf.presentationData.strings.Common_OK, action: {}))
                                         actions.append(TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Login_PhoneNumberHelp, action: { [weak controller] in
@@ -252,9 +289,11 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                                             AuthorizationSequenceController.presentEmailComposeController(sharedContext: strongSelf.sharedContext, address: "recover@telegram.org", subject: strongSelf.presentationData.strings.Login_InvalidPhoneEmailSubject(formattedNumber).string, body: strongSelf.presentationData.strings.Login_InvalidPhoneEmailBody(formattedNumber, appVersion, systemVersion, locale, mnc).string, from: controller, presentationData: strongSelf.presentationData)
                                         }))
                                     case .phoneLimitExceeded:
+                                        title = nil
                                         text = strongSelf.presentationData.strings.Login_PhoneFloodError
                                         actions.append(TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Common_OK, action: {}))
                                     case .appOutdated:
+                                        title = nil
                                         text = strongSelf.presentationData.strings.Login_ErrorAppOutdated
                                         let updateUrl = strongSelf.presentationData.strings.InviteText_URL
                                         let sharedContext = strongSelf.sharedContext
@@ -262,6 +301,7 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                                             sharedContext.applicationBindings.openUrl(updateUrl)
                                         }))
                                     case .phoneBanned:
+                                        title = nil
                                         text = strongSelf.presentationData.strings.Login_PhoneBannedError
                                         actions.append(TextAlertAction(type: .genericAction, title: strongSelf.presentationData.strings.Common_OK, action: {}))
                                         actions.append(TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Login_PhoneNumberHelp, action: { [weak controller] in
@@ -278,8 +318,22 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                                             AuthorizationSequenceController.presentEmailComposeController(sharedContext: strongSelf.sharedContext, address: "recover@telegram.org", subject: strongSelf.presentationData.strings.Login_PhoneBannedEmailSubject(formattedNumber).string, body: strongSelf.presentationData.strings.Login_PhoneBannedEmailBody(formattedNumber, appVersion, systemVersion, locale, mnc).string, from: controller, presentationData: strongSelf.presentationData)
                                         }))
                                     case let .generic(info):
-                                        text = strongSelf.presentationData.strings.Login_UnknownError
+                                        let errorString: String
+                                        if let (code, description) = info {
+                                            errorString = "\(code): \(description)"
+                                        } else {
+                                            errorString = "unknown"
+                                        }
+                                        title = "Authorization Error"
+                                        text = "Telegram returned an error: \(errorString)\n\nIf you need help, please submit logs."
                                         actions.append(TextAlertAction(type: .genericAction, title: strongSelf.presentationData.strings.Common_OK, action: {}))
+                                        actions.append(TextAlertAction(type: .genericAction, title: "LightGram Diagnostics", action: { [weak controller] in
+                                            guard let strongSelf = self, let controller = controller else {
+                                                return
+                                            }
+                                            let diagController = LightGramDiagnosticsController(presentationData: strongSelf.presentationData, apiId: strongSelf.apiId)
+                                            controller.present(diagController, in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+                                        }))
                                         actions.append(TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Login_PhoneNumberHelp, action: { [weak controller] in
                                             guard let strongSelf = self, let controller = controller else {
                                                 return
@@ -290,16 +344,11 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                                             let locale = Locale.current.identifier
                                             let carrier = CTCarrier()
                                             let mnc = carrier.mobileNetworkCode ?? "none"
-                                            let errorString: String
-                                            if let (code, description) = info {
-                                                errorString = "\(code): \(description)"
-                                            } else {
-                                                errorString = "unknown"
-                                            }
                                             
                                             AuthorizationSequenceController.presentEmailComposeController(sharedContext: strongSelf.sharedContext, address: "recover@telegram.org", subject: strongSelf.presentationData.strings.Login_PhoneGenericEmailSubject(formattedNumber).string, body: strongSelf.presentationData.strings.Login_PhoneGenericEmailBody(formattedNumber, errorString, appVersion, systemVersion, locale, mnc).string, from: controller, presentationData: strongSelf.presentationData)
                                         }))
                                     case .timeout:
+                                        title = "Connection Timeout"
                                         text = strongSelf.presentationData.strings.Login_NetworkError
                                         actions.append(TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Common_OK, action: {}))
                                         actions.append(TextAlertAction(type: .genericAction, title: strongSelf.presentationData.strings.ChatSettings_ConnectionType_UseProxy, action: { [weak controller] in
@@ -312,11 +361,11 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                                             guard let strongSelf = self, let controller = controller else {
                                                 return
                                             }
-                                            let diagController = LightGramDiagnosticsController(presentationData: strongSelf.presentationData)
+                                            let diagController = LightGramDiagnosticsController(presentationData: strongSelf.presentationData, apiId: strongSelf.apiId)
                                             controller.present(diagController, in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
                                         }))
                                 }
-                                (controller.navigationController as? NavigationController)?.presentOverlay(controller: textAlertController(sharedContext: strongSelf.sharedContext, title: nil, text: text, actions: actions), inGlobal: true, blockInteraction: true)
+                                (controller.navigationController as? NavigationController)?.presentOverlay(controller: textAlertController(sharedContext: strongSelf.sharedContext, title: title, text: text, actions: actions), inGlobal: true, blockInteraction: true)
                                 
                                 controller.dismissConfirmation()
                             }
@@ -668,14 +717,19 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                             var actions: [TextAlertAction] = [TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Common_OK, action: {})]
                             
                             let text: String
+                            let title: String?
                             switch error {
                                 case .limitExceeded:
+                                    title = nil
                                     text = strongSelf.presentationData.strings.Login_CodeFloodError
                                 case .invalidPhoneNumber:
+                                    title = nil
                                     text = strongSelf.presentationData.strings.Login_InvalidPhoneError
                                 case .phoneLimitExceeded:
+                                    title = nil
                                     text = strongSelf.presentationData.strings.Login_PhoneFloodError
                                 case .appOutdated:
+                                    title = nil
                                     text = strongSelf.presentationData.strings.Login_ErrorAppOutdated
                                     let updateUrl = strongSelf.presentationData.strings.InviteText_URL
                                     let sharedContext = strongSelf.sharedContext
@@ -683,14 +737,32 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                                         sharedContext.applicationBindings.openUrl(updateUrl)
                                     })]
                                 case .phoneBanned:
+                                    title = nil
                                     text = strongSelf.presentationData.strings.Login_PhoneBannedError
+                                case .apiIdPublishedFlood:
+                                    title = "API ID Restricted"
+                                    text = "Telegram has blocked the sample API ID (8) with API_ID_PUBLISHED_FLOOD. Please configure personal credentials from my.telegram.org."
+                                case .apiIdInvalid:
+                                    title = "Invalid API Credentials"
+                                    text = "Telegram API ID / Hash is invalid."
+                                case let .floodWait(seconds):
+                                    title = "Flood Wait"
+                                    text = "Please wait \(max(1, seconds / 60)) minute(s) before requesting another code."
+                                case .paymentRequired:
+                                    title = "Payment Required"
+                                    text = "SMS payment required by Telegram."
+                                case .signUpRequired:
+                                    title = "Sign Up Required"
+                                    text = "Phone number is not registered."
                                 case .generic:
+                                    title = nil
                                     text = strongSelf.presentationData.strings.Login_UnknownError
                                 case .timeout:
+                                    title = nil
                                     text = strongSelf.presentationData.strings.Login_NetworkError
                             }
                             
-                            controller.present(textAlertController(sharedContext: strongSelf.sharedContext, title: nil, text: text, actions: actions), in: .window(.root))
+                            controller.present(textAlertController(sharedContext: strongSelf.sharedContext, title: title, text: text, actions: actions), in: .window(.root))
                         }
                     }))
                 }

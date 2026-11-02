@@ -9,6 +9,7 @@ import Network
 
 public final class LightGramDiagnosticsController: ViewController {
     private let presentationData: PresentationData
+    private let apiId: Int32?
     private var scrollView: UIScrollView?
     private var textView: UITextView?
     private var statusLabel: UILabel?
@@ -17,8 +18,9 @@ public final class LightGramDiagnosticsController: ViewController {
     private var shareButton: UIButton?
     private var testConnections: [NWConnection] = []
     
-    public init(presentationData: PresentationData) {
+    public init(presentationData: PresentationData, apiId: Int32? = nil) {
         self.presentationData = presentationData
+        self.apiId = apiId
         
         super.init(navigationBarPresentationData: NavigationBarPresentationData(theme: AuthorizationSequenceController.navigationBarTheme(presentationData.theme), strings: NavigationBarStrings(presentationStrings: presentationData.strings)))
         
@@ -79,12 +81,24 @@ public final class LightGramDiagnosticsController: ViewController {
         let model = device.model
         let logLines = Logger.shared.getRecentLogLines()
         
+        let apiStatus: String
+        if let apiId = self.apiId {
+            if apiId == 8 {
+                apiStatus = "Sample (api_id=8 - Restricted by Telegram: API_ID_PUBLISHED_FLOOD)"
+            } else {
+                apiStatus = "Custom (api_id=\(apiId) - Production Configured)"
+            }
+        } else {
+            apiStatus = "Default (Sample API ID 8)"
+        }
+        
         let report = """
-        === LightGram V1 Network Diagnostic Report ===
+        === LightGram V1 Authorization & Network Report ===
         App Version: \(appVersion)
         Bundle ID: \(bundleId)
         Device: \(model) (iOS \(systemVersion))
         Timestamp: \(Date())
+        API Credentials: \(apiStatus)
         
         === Telegram Endpoints ===
         Active DC: DC 2 (149.154.167.50:443)
@@ -96,7 +110,7 @@ public final class LightGramDiagnosticsController: ViewController {
         === Connectivity Test Results ===
         \(self.pingStatusLabel?.text ?? "Not run yet")
         
-        === Recent Network Logs (Total: \(logLines.count) lines) ===
+        === Recent Authorization & MTProto Logs (Total: \(logLines.count) lines) ===
         \(logLines.joined(separator: "\n"))
         """
         return report

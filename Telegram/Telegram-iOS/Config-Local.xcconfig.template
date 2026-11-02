@@ -1,0 +1,4 @@
+// Copy this file to Config-Local.xcconfig and configure your credentials from https://my.telegram.org
+// Never commit Config-Local.xcconfig into version control.
+APP_CONFIG_API_ID = 8
+APP_CONFIG_API_HASH = "7245de8e747a0d6fbe11f7cc14fcc0bb"

@@ -67,6 +67,41 @@ def build_configuration_from_json(path):
         sys.exit(1)
     with open(path) as file:
         configuration_dict = json.load(file)
+
+        # Check for local credentials override file (gitignored)
+        credentials_path = os.path.join(os.path.dirname(path), 'lightgram-credentials.json')
+        if os.path.exists(credentials_path):
+            try:
+                with open(credentials_path) as cred_file:
+                    creds = json.load(cred_file)
+                    if creds.get('api_id'):
+                        configuration_dict['api_id'] = str(creds['api_id']).strip()
+                    if creds.get('api_hash'):
+                        configuration_dict['api_hash'] = str(creds['api_hash']).strip()
+                    print('Loaded local API credentials from {}'.format(credentials_path))
+            except Exception as e:
+                print('Warning: Failed to load credentials from {}: {}'.format(credentials_path, e))
+
+        # Check for environment variable overrides (CI secrets or local export)
+        env_api_id = os.environ.get('LIGHTGRAM_API_ID') or os.environ.get('CUSTOM_API_ID')
+        if env_api_id and env_api_id.strip():
+            configuration_dict['api_id'] = env_api_id.strip()
+
+        env_api_hash = os.environ.get('LIGHTGRAM_API_HASH') or os.environ.get('CUSTOM_API_HASH')
+        if env_api_hash and env_api_hash.strip():
+            configuration_dict['api_hash'] = env_api_hash.strip()
+
+        # Enforce production credentials if requested
+        require_prod = os.environ.get('REQUIRE_PRODUCTION_CREDENTIALS', '').lower() in ['1', 'true', 'yes'] or \
+                       os.environ.get('LIGHTGRAM_REQUIRE_PRODUCTION_CREDENTIALS', '').lower() in ['1', 'true', 'yes']
+        current_api_id = str(configuration_dict.get('api_id', '')).strip()
+        is_sample_or_missing = not current_api_id or current_api_id in ['8', '0']
+
+        if require_prod and is_sample_or_missing:
+            print('ERROR: Production credentials are required, but api_id is missing or set to sample ID 8.')
+            print('Please supply valid api_id and api_hash via LIGHTGRAM_API_ID / LIGHTGRAM_API_HASH or in lightgram-credentials.json.')
+            sys.exit(1)
+
         required_keys = [
             'bundle_id',
             'api_id',

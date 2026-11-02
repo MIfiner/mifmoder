@@ -151,7 +151,7 @@ public final class AuthorizationSequencePhoneEntryController: ViewController, MF
             let alert = textAlertController(sharedContext: strongSelf.sharedContext, title: "LightGram Developer Options", text: "Select a tool to diagnose or configure network:", actions: [
                 TextAlertAction(type: .defaultAction, title: "Network Diagnostics", action: { [weak self] in
                     guard let strongSelf = self else { return }
-                    let diagController = LightGramDiagnosticsController(presentationData: strongSelf.presentationData)
+                    let diagController = LightGramDiagnosticsController(presentationData: strongSelf.presentationData, apiId: strongSelf.apiId)
                     strongSelf.present(diagController, in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
                 }),
                 TextAlertAction(type: .genericAction, title: "Proxy Settings", action: { [weak self] in

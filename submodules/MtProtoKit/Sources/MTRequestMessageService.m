@@ -141,6 +141,7 @@
             }
             
             [_requests addObject:request];
+            MTShortLog(@"[LightGram Auth] (Stage 2/7) Request enqueued: %@ on DC %d", request.shortMetadata ?: request.metadata, (int)mtProto.datacenterId);
             [mtProto requestTransportTransaction];
         }
     }];
@@ -762,6 +763,7 @@
                         requestContext.willInitializeApi = requestsWillInitializeApi;
                         request.requestContext = requestContext;
                         request.mayHaveReachedServer = true;
+                        MTShortLog(@"[LightGram Auth] (Stage 3/7) Request transmitted: reqMsgId=%" PRId64 " on DC %d", requestContext.messageId, (int)self->_mtProto.datacenterId);
                     }
                 }
             }
@@ -792,6 +794,12 @@
         NSData *resultData = [MTInternalMessageParser unwrapMessage:rpcResultMessage.data];
         id maybeInternalMessage = resultData != nil ? [MTInternalMessageParser parseMessage:resultData] : nil;
         
+        uint32_t constructorId = 0;
+        if (resultData.length >= 4) {
+            [resultData getBytes:&constructorId length:4];
+        }
+        MTShortLog(@"[LightGram Auth] (Stage 4/7) RPC Result received: reqMsgId=%" PRId64 " (len=%lu, ctor=0x%08x)", rpcResultMessage.requestMessageId, (unsigned long)rpcResultMessage.data.length, constructorId);
+        
         if ([maybeInternalMessage isKindOfClass:[MTDropRpcResultMessage class]])
         {
             NSInteger index = -1;
@@ -819,8 +827,10 @@
                     id rpcResult = nil;
                     MTRpcError *rpcError = nil;
                     
-                    if ([maybeInternalMessage isKindOfClass:[MTRpcError class]])
+                    if ([maybeInternalMessage isKindOfClass:[MTRpcError class]]) {
                         rpcError = maybeInternalMessage;
+                        MTShortLog(@"[LightGram Auth] (Stage 5/7) RPC Error received: code=%d desc=%@ for reqMsgId=%" PRId64, (int)rpcError.errorCode, rpcError.errorDescription, rpcResultMessage.requestMessageId);
+                    }
                     else
                     {
                         if (resultData != nil) {
@@ -829,6 +839,7 @@
                         if (rpcResult == nil)
                         {
                             rpcError = [[MTRpcError alloc] initWithErrorCode:500 errorDescription:@"TL_PARSING_ERROR"];
+                            MTShortLog(@"[LightGram Auth] (Stage 5/7) TL_PARSING_ERROR ctor=0x%08x len=%lu for reqMsgId=%" PRId64, constructorId, (unsigned long)resultData.length, rpcResultMessage.requestMessageId);
                             [_context performBatchUpdates:^{
                                 MTDatacenterAuthInfo *authInfo = [_context authInfoForDatacenterWithId:mtProto.datacenterId selector:authInfoSelector];
                                 
@@ -838,6 +849,8 @@
                                 authInfo = [authInfo withUpdatedAuthKeyAttributes:authKeyAttributes];
                                 [_context updateAuthInfoForDatacenterWithId:mtProto.datacenterId authInfo:authInfo selector:authInfoSelector];
                             }];
+                        } else {
+                            MTShortLog(@"[LightGram Auth] (Stage 5/7) RPC Result decoded: %@ for reqMsgId=%" PRId64, NSStringFromClass([rpcResult class]), rpcResultMessage.requestMessageId);
                         }
                     }
                     
@@ -1066,8 +1079,10 @@
                     request.requestContext = nil;
                     
                     if (restartRequest) {
+                        MTShortLog(@"[LightGram Auth] Decision: restartRequest=true for reqMsgId=%" PRId64 " reason=%@", rpcResultMessage.requestMessageId, rpcError.errorDescription);
                         request.mayHaveReachedServer = false;
                     } else {
+                        MTShortLog(@"[LightGram Auth] Decision: completing reqMsgId=%" PRId64 " (hasResult=%d, hasError=%d)", rpcResultMessage.requestMessageId, rpcResult != nil, rpcError != nil);
                         void (^completed)(id result, MTRequestResponseInfo *info, id error) = [request.completed copy];
                         [removeRequests addObject:request];
                         
@@ -1094,6 +1109,7 @@
             }
             
             if (!requestFound) {
+                MTShortLog(@"[LightGram Auth] WARNING: RPC result reqMsgId=%" PRId64 " didn't match any active request", rpcResultMessage.requestMessageId);
                 if (MTLogEnabled()) {
                     MTLog(@"[MTRequestMessageService#%p response %" PRId64 " for % " PRId64 " didn't match any request]", self, message.messageId, rpcResultMessage.requestMessageId);
                 }

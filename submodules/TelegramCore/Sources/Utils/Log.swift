@@ -444,6 +444,14 @@ public final class Logger {
         gettimeofday(&curTime, nil)
         let milliseconds = curTime.tv_usec / 1000
         
+        let formattedShortLog = String(format: "[%@] %d-%d-%d %02d:%02d:%02d.%03d %@", arguments: [tag, Int(timeinfo.tm_year) + 1900, Int(timeinfo.tm_mon + 1), Int(timeinfo.tm_mday), Int(timeinfo.tm_hour), Int(timeinfo.tm_min), Int(timeinfo.tm_sec), Int(milliseconds), string])
+        self.logBufferLock.lock()
+        self.inMemoryLogs.append(formattedShortLog)
+        if self.inMemoryLogs.count > self.maxInMemoryLogs {
+            self.inMemoryLogs.removeFirst(self.inMemoryLogs.count - self.maxInMemoryLogs)
+        }
+        self.logBufferLock.unlock()
+        
         let timestamp: Double = CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970
         
         self.queue.async {

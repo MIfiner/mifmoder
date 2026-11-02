@@ -13,6 +13,11 @@ public enum AuthorizationCodeRequestError {
     case phoneBanned
     case timeout
     case appOutdated
+    case apiIdPublishedFlood
+    case apiIdInvalid
+    case floodWait(Int)
+    case paymentRequired(storeProduct: String?, phoneCodeHash: String?, currency: String?, amount: Int64?)
+    case signUpRequired
 }
 
 func switchToAuthorizedAccount(transaction: AccountManagerModifier<TelegramAccountManagerTypes>, account: UnauthorizedAccount, isSupportUser: Bool) {
@@ -185,6 +190,17 @@ public func sendAuthorizationCode(accountManager: AccountManager<TelegramAccount
             appSandbox = pushNotificationConfiguration.isSandbox ? .boolTrue : .boolFalse
         }
         
+        let startTime = CFAbsoluteTimeGetCurrent()
+        let maskedPhone: String
+        if phoneNumber.count > 6 {
+            let prefix = phoneNumber.prefix(4)
+            let suffix = phoneNumber.suffix(2)
+            maskedPhone = "\(prefix) *** \(suffix)"
+        } else {
+            maskedPhone = "***"
+        }
+        Logger.shared.log("LightGram Auth", "(Stage 1/7) auth.sendCode created for phone=\(maskedPhone), apiId=\(apiId), masterDC=\(account.masterDatacenterId)")
+
         let sendCode = Api.functions.auth.sendCode(phoneNumber: phoneNumber, apiId: apiId, apiHash: apiHash, settings: .codeSettings(.init(flags: flags, logoutTokens: authTokens.map { Buffer(data: $0) }, token: token, appSandbox: appSandbox)))
         
         enum SendCodeResult {
@@ -192,26 +208,28 @@ public func sendAuthorizationCode(accountManager: AccountManager<TelegramAccount
             case sentCode(Api.auth.SentCode)
         }
         
-        print("[LightGram Network] sendAuthorizationCode: initiating request to master DC \(account.masterDatacenterId)...")
-        Logger.shared.log("LightGram Network", "sendAuthorizationCode: initiating request to master DC \(account.masterDatacenterId)...")
         let codeAndAccount = account.network.request(sendCode, automaticFloodWait: false)
         |> map { result -> (SendCodeResult, UnauthorizedAccount) in
-            print("[LightGram Network] sendAuthorizationCode received response from master DC \(account.masterDatacenterId)")
-            Logger.shared.log("LightGram Network", "sendAuthorizationCode received response from master DC \(account.masterDatacenterId)")
+            let elapsed = CFAbsoluteTimeGetCurrent() - startTime
+            Logger.shared.log("LightGram Auth", "(Stage 6/7) sendAuthorizationCode raw response received in \(String(format: "%.2f", elapsed))s from master DC \(account.masterDatacenterId)")
             return (.sentCode(result), account)
         }
         |> `catch` { error -> Signal<(SendCodeResult, UnauthorizedAccount), MTRpcError> in
-            print("[LightGram Network] sendAuthorizationCode RPC error: code=\(error.errorCode) desc=\(error.errorDescription ?? "none")")
-            Logger.shared.log("LightGram Network", "sendAuthorizationCode RPC error: code=\(error.errorCode) desc=\(error.errorDescription ?? "none")")
-            switch MatchString(error.errorDescription ?? "") {
+            let elapsed = CFAbsoluteTimeGetCurrent() - startTime
+            let desc = error.errorDescription ?? ""
+            Logger.shared.log("LightGram Auth", "(Stage 6/7) sendAuthorizationCode MTRpcError: code=\(error.errorCode) desc=\(desc) in \(String(format: "%.2f", elapsed))s")
+            switch MatchString(desc) {
                 case Regex("(PHONE_|USER_|NETWORK_)MIGRATE_(\\d+)"):
-                    let range = error.errorDescription.range(of: "MIGRATE_")!
-                    let updatedMasterDatacenterId = Int32(error.errorDescription[range.upperBound ..< error.errorDescription.endIndex])!
+                    let range = desc.range(of: "MIGRATE_")!
+                    let updatedMasterDatacenterId = Int32(desc[range.upperBound ..< desc.endIndex])!
+                    Logger.shared.log("LightGram Auth", "(Stage 6/7) Migrating to DC \(updatedMasterDatacenterId)...")
                     let updatedAccount = account.changedMasterDatacenterId(accountManager: accountManager, masterDatacenterId: updatedMasterDatacenterId)
                     return updatedAccount
                     |> mapToSignalPromotingError { updatedAccount -> Signal<(SendCodeResult, UnauthorizedAccount), MTRpcError> in
                         return updatedAccount.network.request(sendCode, automaticFloodWait: false)
                         |> map { sentCode in
+                            let migElapsed = CFAbsoluteTimeGetCurrent() - startTime
+                            Logger.shared.log("LightGram Auth", "(Stage 6/7) sendAuthorizationCode response on migrated DC \(updatedMasterDatacenterId) in \(String(format: "%.2f", migElapsed))s")
                             return (.sentCode(sentCode), updatedAccount)
                         }
                         |> `catch` { error -> Signal<(SendCodeResult, UnauthorizedAccount), MTRpcError> in
@@ -234,23 +252,44 @@ public func sendAuthorizationCode(accountManager: AccountManager<TelegramAccount
             }
         }
         |> `catch` { error -> Signal<(SendCodeResult, UnauthorizedAccount), AuthorizationCodeRequestError> in
-            if error.errorDescription.hasPrefix("FLOOD_WAIT") {
+            let elapsed = CFAbsoluteTimeGetCurrent() - startTime
+            let desc = error.errorDescription ?? ""
+            if desc == "API_ID_PUBLISHED_FLOOD" {
+                Logger.shared.log("LightGram Auth", "(Stage 6/7) Caught API_ID_PUBLISHED_FLOOD in \(String(format: "%.2f", elapsed))s")
+                return .fail(.apiIdPublishedFlood)
+            } else if desc == "API_ID_INVALID" {
+                Logger.shared.log("LightGram Auth", "(Stage 6/7) Caught API_ID_INVALID in \(String(format: "%.2f", elapsed))s")
+                return .fail(.apiIdInvalid)
+            } else if desc.hasPrefix("FLOOD_WAIT_") {
+                let waitSeconds = Int(desc.replacingOccurrences(of: "FLOOD_WAIT_", with: "")) ?? 0
+                Logger.shared.log("LightGram Auth", "(Stage 6/7) Caught FLOOD_WAIT_\(waitSeconds) in \(String(format: "%.2f", elapsed))s")
+                return .fail(.floodWait(waitSeconds))
+            } else if desc.hasPrefix("FLOOD_WAIT") {
+                Logger.shared.log("LightGram Auth", "(Stage 6/7) Caught FLOOD_WAIT in \(String(format: "%.2f", elapsed))s")
                 return .fail(.limitExceeded)
-            } else if error.errorDescription == "PHONE_NUMBER_INVALID" {
+            } else if desc == "PHONE_NUMBER_INVALID" {
+                Logger.shared.log("LightGram Auth", "(Stage 6/7) Caught PHONE_NUMBER_INVALID in \(String(format: "%.2f", elapsed))s")
                 return .fail(.invalidPhoneNumber)
-            } else if error.errorDescription == "PHONE_NUMBER_FLOOD" {
+            } else if desc == "PHONE_NUMBER_FLOOD" {
+                Logger.shared.log("LightGram Auth", "(Stage 6/7) Caught PHONE_NUMBER_FLOOD in \(String(format: "%.2f", elapsed))s")
                 return .fail(.phoneLimitExceeded)
-            } else if error.errorDescription == "PHONE_NUMBER_BANNED" {
+            } else if desc == "PHONE_NUMBER_BANNED" {
+                Logger.shared.log("LightGram Auth", "(Stage 6/7) Caught PHONE_NUMBER_BANNED in \(String(format: "%.2f", elapsed))s")
                 return .fail(.phoneBanned)
-            } else if error.errorDescription == "UPDATE_APP_TO_LOGIN" {
+            } else if desc == "UPDATE_APP_TO_LOGIN" {
+                Logger.shared.log("LightGram Auth", "(Stage 6/7) Caught UPDATE_APP_TO_LOGIN in \(String(format: "%.2f", elapsed))s")
                 return .fail(.appOutdated)
-            } else if error.errorDescription == "SESSION_PASSWORD_NEEDED" {
+            } else if desc == "SESSION_PASSWORD_NEEDED" {
                 return account.network.request(Api.functions.account.getPassword(), automaticFloodWait: false)
                 |> mapError { error -> AuthorizationCodeRequestError in
-                    if error.errorDescription.hasPrefix("FLOOD_WAIT") {
+                    let pDesc = error.errorDescription ?? ""
+                    if pDesc.hasPrefix("FLOOD_WAIT_") {
+                        let waitSeconds = Int(pDesc.replacingOccurrences(of: "FLOOD_WAIT_", with: "")) ?? 0
+                        return .floodWait(waitSeconds)
+                    } else if pDesc.hasPrefix("FLOOD_WAIT") {
                         return .limitExceeded
                     } else {
-                        return .generic(info: (Int(error.errorCode), error.errorDescription))
+                        return .generic(info: (Int(error.errorCode), pDesc))
                     }
                 }
                 |> mapToSignal { result -> Signal<(SendCodeResult, UnauthorizedAccount), AuthorizationCodeRequestError> in
@@ -261,7 +300,8 @@ public func sendAuthorizationCode(accountManager: AccountManager<TelegramAccount
                     }
                 }
             } else {
-                return .fail(.generic(info: (Int(error.errorCode), error.errorDescription)))
+                Logger.shared.log("LightGram Auth", "(Stage 6/7) Caught generic RPC error: \(error.errorCode): \(desc) in \(String(format: "%.2f", elapsed))s")
+                return .fail(.generic(info: (Int(error.errorCode), desc)))
             }
         }
         |> timeout(20.0, queue: Queue.concurrentDefaultQueue(), alternate: .fail(.timeout))
@@ -366,13 +406,18 @@ public func sendAuthorizationCode(accountManager: AccountManager<TelegramAccount
                             }
                         }
                         transaction.setState(UnauthorizedAccountState(isTestingEnvironment: account.testingEnvironment, masterDatacenterId: account.masterDatacenterId, contents: .confirmationCodeEntry(number: phoneNumber, type: parsedType, hash: phoneCodeHash, timeout: codeTimeout, nextType: parsedNextType, syncContacts: syncContacts, previousCodeEntry: previousCodeEntry, usePrevious: false)))
-                    case .sentCodePaymentRequired:
-                        return .never()
+                        Logger.shared.log("LightGram Auth", "(Stage 6/7) sentCode: type=\(parsedType) timeout=\(codeTimeout ?? 0)")
+                    case let .sentCodePaymentRequired(sentCodePaymentRequiredData):
+                        let (storeProduct, codeHash, supportEmailAddress, supportEmailSubject, premiumDays) = (sentCodePaymentRequiredData.storeProduct, sentCodePaymentRequiredData.phoneCodeHash, sentCodePaymentRequiredData.supportEmailAddress, sentCodePaymentRequiredData.supportEmailSubject, sentCodePaymentRequiredData.premiumDays)
+                        Logger.shared.log("LightGram Auth", "(Stage 6/7) sentCodePaymentRequired: product=\(storeProduct ?? "nil") days=\(premiumDays ?? 0)")
+                        transaction.setState(UnauthorizedAccountState(isTestingEnvironment: account.testingEnvironment, masterDatacenterId: account.masterDatacenterId, contents: .payment(number: phoneNumber, codeHash: codeHash, storeProduct: storeProduct, premiumDays: premiumDays, supportEmailAddress: supportEmailAddress, supportEmailSubject: supportEmailSubject, syncContacts: syncContacts)))
+                        return .single(.sentCode(account))
                     case let .sentCodeSuccess(sentCodeSuccessData):
                         let authorization = sentCodeSuccessData.authorization
                         switch authorization {
                         case let .authorization(authorizationData):
                             let (otherwiseReloginDays, futureAuthToken, apiUser) = (authorizationData.otherwiseReloginDays, authorizationData.futureAuthToken, authorizationData.user)
+                            Logger.shared.log("LightGram Auth", "(Stage 6/7) sentCodeSuccess: direct login")
                             if let futureAuthToken = futureAuthToken {
                                 storeFutureLoginToken(accountManager: accountManager, token: futureAuthToken.makeData())
                             }
@@ -394,7 +439,8 @@ public func sendAuthorizationCode(accountManager: AccountManager<TelegramAccount
                             }
                             |> castError(AuthorizationCodeRequestError.self)
                         case .authorizationSignUpRequired:
-                            return .never()
+                            Logger.shared.log("LightGram Auth", "(Stage 6/7) authorizationSignUpRequired")
+                            return .fail(.signUpRequired)
                         }
                     }
                     return .single(.sentCode(account))
@@ -422,18 +468,26 @@ private func internalResendAuthorizationCode(accountManager: AccountManager<Tele
     
     return account.network.request(Api.functions.auth.resendCode(flags: flags, phoneNumber: number, phoneCodeHash: hash, reason: mappedReason), automaticFloodWait: false)
     |> mapError { error -> AuthorizationCodeRequestError in
-        if error.errorDescription.hasPrefix("FLOOD_WAIT") {
+        let desc = error.errorDescription ?? ""
+        if desc == "API_ID_PUBLISHED_FLOOD" {
+            return .apiIdPublishedFlood
+        } else if desc == "API_ID_INVALID" {
+            return .apiIdInvalid
+        } else if desc.hasPrefix("FLOOD_WAIT_") {
+            let waitSeconds = Int(desc.replacingOccurrences(of: "FLOOD_WAIT_", with: "")) ?? 0
+            return .floodWait(waitSeconds)
+        } else if desc.hasPrefix("FLOOD_WAIT") {
             return .limitExceeded
-        } else if error.errorDescription == "PHONE_NUMBER_INVALID" {
+        } else if desc == "PHONE_NUMBER_INVALID" {
             return .invalidPhoneNumber
-        } else if error.errorDescription == "PHONE_NUMBER_FLOOD" {
+        } else if desc == "PHONE_NUMBER_FLOOD" {
             return .phoneLimitExceeded
-        } else if error.errorDescription == "PHONE_NUMBER_BANNED" {
+        } else if desc == "PHONE_NUMBER_BANNED" {
             return .phoneBanned
-        } else if error.errorDescription == "UPDATE_APP_TO_LOGIN" {
+        } else if desc == "UPDATE_APP_TO_LOGIN" {
             return .appOutdated
         } else {
-            return .generic(info: (Int(error.errorCode), error.errorDescription))
+            return .generic(info: (Int(error.errorCode), desc))
         }
     }
     |> mapToSignal { sentCode -> Signal<SendAuthorizationCodeResult, AuthorizationCodeRequestError> in
@@ -553,18 +607,26 @@ public func resendAuthorizationCode(accountManager: AccountManager<TelegramAccou
                     if nextType != nil {
                         return account.network.request(Api.functions.auth.resendCode(flags: 0, phoneNumber: number, phoneCodeHash: hash, reason: nil), automaticFloodWait: false)
                         |> mapError { error -> AuthorizationCodeRequestError in
-                            if error.errorDescription.hasPrefix("FLOOD_WAIT") {
+                            let desc = error.errorDescription ?? ""
+                            if desc == "API_ID_PUBLISHED_FLOOD" {
+                                return .apiIdPublishedFlood
+                            } else if desc == "API_ID_INVALID" {
+                                return .apiIdInvalid
+                            } else if desc.hasPrefix("FLOOD_WAIT_") {
+                                let waitSeconds = Int(desc.replacingOccurrences(of: "FLOOD_WAIT_", with: "")) ?? 0
+                                return .floodWait(waitSeconds)
+                            } else if desc.hasPrefix("FLOOD_WAIT") {
                                 return .limitExceeded
-                            } else if error.errorDescription == "PHONE_NUMBER_INVALID" {
+                            } else if desc == "PHONE_NUMBER_INVALID" {
                                 return .invalidPhoneNumber
-                            } else if error.errorDescription == "PHONE_NUMBER_FLOOD" {
+                            } else if desc == "PHONE_NUMBER_FLOOD" {
                                 return .phoneLimitExceeded
-                            } else if error.errorDescription == "PHONE_NUMBER_BANNED" {
+                            } else if desc == "PHONE_NUMBER_BANNED" {
                                 return .phoneBanned
-                            } else if error.errorDescription == "UPDATE_APP_TO_LOGIN" {
+                            } else if desc == "UPDATE_APP_TO_LOGIN" {
                                 return .appOutdated
                             } else {
-                                return .generic(info: (Int(error.errorCode), error.errorDescription))
+                                return .generic(info: (Int(error.errorCode), desc))
                             }
                         }
                         |> mapToSignal { sentCode -> Signal<Void, AuthorizationCodeRequestError> in

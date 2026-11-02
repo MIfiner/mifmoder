@@ -37,11 +37,14 @@ void MTLogWithPrefix(NSString *(^getLogPrefix)(), NSString *format, ...) {
 void MTShortLog(NSString *format, ...) {
     va_list L;
     va_start(L, format);
+    NSString *string = [[NSString alloc] initWithFormat:format arguments:L];
+    va_end(L);
+    if ([string rangeOfString:@"[LightGram Auth]"].location != NSNotFound) {
+        NSLog(@"%@", string);
+    }
     if (shortLoggingFunction != NULL) {
-        NSString *string = [[NSString alloc] initWithFormat:format arguments:L];
         shortLoggingFunction(string);
     }
-    va_end(L);
 }
 
 void MTLogSetLoggingFunction(void (*function)(NSString *)) {

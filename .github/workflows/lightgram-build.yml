@@ -28,6 +28,11 @@ on:
         required: true
         default: true
         type: boolean
+      require_production_credentials:
+        description: 'Enforce valid non-sample API credentials (fail if api_id is 8 or empty)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -95,20 +100,32 @@ jobs:
           CUSTOM_API_HASH: ${{ secrets.LIGHTGRAM_API_HASH }}
           CUSTOM_TEAM_ID: ${{ secrets.LIGHTGRAM_TEAM_ID }}
           CUSTOM_BUNDLE_ID: ${{ secrets.LIGHTGRAM_BUNDLE_ID }}
+          REQUIRE_PROD: ${{ inputs.require_production_credentials }}
         run: |
+          if [ -n "$CUSTOM_API_ID" ]; then
+            echo "::add-mask::$CUSTOM_API_ID"
+          fi
+          if [ -n "$CUSTOM_API_HASH" ]; then
+            echo "::add-mask::$CUSTOM_API_HASH"
+          fi
+
           python3 - << 'EOF'
-          import json, os, subprocess
+          import json, os, sys, subprocess
 
           config_path = "build-system/lightgram-configuration.json"
           with open(config_path, "r") as f:
             data = json.load(f)
 
-          if os.getenv("CUSTOM_API_ID"):
-            data["api_id"] = os.getenv("CUSTOM_API_ID").strip()
+          custom_api_id = os.getenv("CUSTOM_API_ID", "").strip()
+          custom_api_hash = os.getenv("CUSTOM_API_HASH", "").strip()
+          require_prod = os.getenv("REQUIRE_PROD", "").lower() in ["1", "true", "yes"]
+
+          if custom_api_id:
+            data["api_id"] = custom_api_id
             print("Configured custom Telegram API ID from secret")
 
-          if os.getenv("CUSTOM_API_HASH"):
-            data["api_hash"] = os.getenv("CUSTOM_API_HASH").strip()
+          if custom_api_hash:
+            data["api_hash"] = custom_api_hash
             print("Configured custom Telegram API HASH from secret")
 
           if os.getenv("CUSTOM_TEAM_ID"):
@@ -121,6 +138,17 @@ jobs:
 
           with open(config_path, "w") as f:
             json.dump(data, f, indent=2)
+
+          current_api_id = str(data.get("api_id", "")).strip()
+          if current_api_id in ["8", "0", ""]:
+            if require_prod:
+              print("::error::Build aborted: Production credentials are required, but api_id is missing or set to sample ID 8.")
+              print("Configure LIGHTGRAM_API_ID and LIGHTGRAM_API_HASH in repo Settings -> Secrets -> Actions.")
+              sys.exit(1)
+            else:
+              print("::warning::Building with sample API ID (8). Real-device phone authorization will be rejected by Telegram servers with API_ID_PUBLISHED_FLOOD (406). Add LIGHTGRAM_API_ID and LIGHTGRAM_API_HASH secrets in repository Settings to authenticate on physical devices.")
+          else:
+            print(f"Production credentials verified with api_id={current_api_id}")
 
           # Update profiles to match bundle_id and team_id
           bundle_id = data.get("bundle_id", "site.lightgram.ios")
