@@ -3,6 +3,7 @@ import UIKit
 import Display
 import AsyncDisplayKit
 import LocalAuthentication
+import TelegramCore
 
 public final class LightGramSpyArchiveController: ViewController, UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate {
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
@@ -14,6 +15,7 @@ public final class LightGramSpyArchiveController: ViewController, UITableViewDat
     private var editRecords: [SpyEditRecord] = []
     private var filteredEdits: [SpyEditRecord] = []
     
+    private var selectedChatFilter: String? = nil
     private var isAuthenticated = false
     
     public init() {
@@ -39,27 +41,39 @@ public final class LightGramSpyArchiveController: ViewController, UITableViewDat
     }
     
     private func setupNavigationBar() {
-        self.navigationItem.rightBarButtonItem = UIBarButtonItem(
+        let filterItem = UIBarButtonItem(
+            title: "Filter",
+            style: .plain,
+            target: self,
+            action: #selector(self.filterTapped)
+        )
+        filterItem.tintColor = LightGramSettings.signatureYellowAccent
+        
+        let clearItem = UIBarButtonItem(
             title: "Clear",
             style: .plain,
             target: self,
             action: #selector(self.clearArchiveTapped)
         )
-        self.navigationItem.rightBarButtonItem?.tintColor = UIColor(rgb: 0xEB5545)
+        clearItem.tintColor = UIColor(rgb: 0xEB5545)
+        
+        self.navigationItem.rightBarButtonItems = [clearItem, filterItem]
     }
     
     private func setupViews() {
         self.segmentedControl.selectedSegmentIndex = 0
         self.segmentedControl.addTarget(self, action: #selector(self.segmentChanged), for: .valueChanged)
         self.segmentedControl.selectedSegmentTintColor = LightGramSettings.signatureYellowAccent
-        self.segmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.black], for: .selected)
-        self.segmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .normal)
+        self.segmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.black, .font: UIFont.systemFont(ofSize: 13, weight: .semibold)], for: .selected)
+        self.segmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.white, .font: UIFont.systemFont(ofSize: 13, weight: .regular)], for: .normal)
         self.view.insertSubview(self.segmentedControl, at: 0)
         
-        self.searchBar.placeholder = "Search messages or sender..."
+        self.searchBar.placeholder = "Search by message text, sender, or chat..."
         self.searchBar.delegate = self
         self.searchBar.barStyle = .black
         self.searchBar.tintColor = LightGramSettings.signatureYellowAccent
+        self.searchBar.searchTextField.textColor = .white
+        self.searchBar.searchTextField.backgroundColor = LightGramSettings.cardSurfaceColor
         self.view.insertSubview(self.searchBar, at: 0)
         
         self.tableView.backgroundColor = LightGramSettings.deepGraphiteBackground
@@ -110,26 +124,60 @@ public final class LightGramSpyArchiveController: ViewController, UITableViewDat
     }
     
     private func loadData() {
-        LightGramSpyManager.shared.fetchDeletedMessages { [weak self] deleted in
+        let group = DispatchGroup()
+        
+        group.enter()
+        LightGramSpyManager.shared.fetchAllDeletedMessages { [weak self] deleted in
+            self?.deletedMessages = deleted
+            group.leave()
+        }
+        
+        group.enter()
+        LightGramSpyManager.shared.fetchAllEditRecords { [weak self] edits in
+            self?.editRecords = edits
+            group.leave()
+        }
+        
+        group.notify(queue: .main) { [weak self] in
             guard let self = self else { return }
-            self.deletedMessages = deleted
+            self.updateSegmentTitles()
             self.filterData()
         }
     }
     
+    private func updateSegmentTitles() {
+        let deletedTitle = "Deleted (\(self.deletedMessages.count))"
+        let editsTitle = "Edits (\(self.editRecords.count))"
+        self.segmentedControl.setTitle(deletedTitle, forSegmentAt: 0)
+        self.segmentedControl.setTitle(editsTitle, forSegmentAt: 1)
+    }
+    
     private func filterData() {
         let query = self.searchBar.text?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if query.isEmpty {
-            self.filteredDeleted = self.deletedMessages
-            self.filteredEdits = self.editRecords
-        } else {
-            self.filteredDeleted = self.deletedMessages.filter {
-                $0.text.lowercased().contains(query) || $0.authorName.lowercased().contains(query)
+        let filterChat = self.selectedChatFilter
+        
+        self.filteredDeleted = self.deletedMessages.filter { item in
+            if let filterChat = filterChat, item.chatTitle != filterChat {
+                return false
             }
-            self.filteredEdits = self.editRecords.filter {
-                $0.newText.lowercased().contains(query) || $0.previousText.lowercased().contains(query) || $0.authorName.lowercased().contains(query)
-            }
+            if query.isEmpty { return true }
+            return item.text.lowercased().contains(query) ||
+                   item.authorName.lowercased().contains(query) ||
+                   item.chatTitle.lowercased().contains(query) ||
+                   (item.mediaDescription?.lowercased().contains(query) ?? false)
         }
+        
+        self.filteredEdits = self.editRecords.filter { item in
+            if let filterChat = filterChat, item.chatTitle != filterChat {
+                return false
+            }
+            if query.isEmpty { return true }
+            return item.newText.lowercased().contains(query) ||
+                   item.previousText.lowercased().contains(query) ||
+                   item.authorName.lowercased().contains(query) ||
+                   item.chatTitle.lowercased().contains(query)
+        }
+        
         self.tableView.reloadData()
     }
     
@@ -137,16 +185,41 @@ public final class LightGramSpyArchiveController: ViewController, UITableViewDat
         self.filterData()
     }
     
+    @objc private func filterTapped() {
+        var chats = Set<String>()
+        for m in self.deletedMessages { chats.insert(m.chatTitle) }
+        for e in self.editRecords { chats.insert(e.chatTitle) }
+        
+        let alert = UIAlertController(title: "Filter by Chat", message: "Select a chat to filter archived messages", preferredStyle: .actionSheet)
+        
+        alert.addAction(UIAlertAction(title: "All Chats", style: self.selectedChatFilter == nil ? .destructive : .default, handler: { [weak self] _ in
+            self?.selectedChatFilter = nil
+            self?.filterData()
+        }))
+        
+        for chat in chats.sorted() {
+            let isCurrent = self.selectedChatFilter == chat
+            alert.addAction(UIAlertAction(title: isCurrent ? "✓ \(chat)" : chat, style: .default, handler: { [weak self] _ in
+                self?.selectedChatFilter = chat
+                self?.filterData()
+            }))
+        }
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        self.present(alert, animated: true)
+    }
+    
     @objc private func clearArchiveTapped() {
         let alert = UIAlertController(
             title: "Clear Spy Archive",
-            message: "Are you sure you want to delete all captured messages? This action cannot be undone.",
+            message: "Are you sure you want to permanently delete all captured messages and edit history? This cannot be undone.",
             preferredStyle: .actionSheet
         )
-        alert.addAction(UIAlertAction(title: "Delete All", style: .destructive, handler: { [weak self] _ in
+        alert.addAction(UIAlertAction(title: "Delete All Records", style: .destructive, handler: { [weak self] _ in
             LightGramSpyManager.shared.clearAllData {
                 self?.deletedMessages = []
                 self?.editRecords = []
+                self?.updateSegmentTitles()
                 self?.filterData()
             }
         }))
@@ -180,37 +253,136 @@ public final class LightGramSpyArchiveController: ViewController, UITableViewDat
         let cell = UITableViewCell(style: .subtitle, reuseIdentifier: "SpyCell")
         cell.backgroundColor = LightGramSettings.cardSurfaceColor
         cell.textLabel?.textColor = .white
-        cell.detailTextLabel?.textColor = UIColor(white: 0.7, alpha: 1.0)
+        cell.detailTextLabel?.textColor = UIColor(white: 0.75, alpha: 1.0)
+        cell.textLabel?.numberOfLines = 1
+        cell.detailTextLabel?.numberOfLines = 4
         
         let isDeleted = self.segmentedControl.selectedSegmentIndex == 0
         if isDeleted {
             if self.filteredDeleted.isEmpty {
-                cell.textLabel?.text = "No deleted messages captured yet."
-                cell.detailTextLabel?.text = "Deleted messages will appear here when detected."
+                cell.textLabel?.text = "No deleted messages captured"
+                cell.detailTextLabel?.text = self.deletedMessages.isEmpty ?
+                    "When messages in your chats are deleted, LightGram preserves them here automatically." :
+                    "No deleted messages match your search filter."
                 cell.textLabel?.textColor = UIColor(white: 0.5, alpha: 1.0)
                 cell.selectionStyle = .none
                 return cell
             }
             let item = self.filteredDeleted[indexPath.row]
-            cell.textLabel?.text = "🗑 [Deleted] \(item.authorName)"
-            cell.textLabel?.textColor = LightGramSettings.signatureYellowAccent
+            
             let dateStr = DateFormatter.localizedString(from: Date(timeIntervalSince1970: TimeInterval(item.deletionTimestamp)), dateStyle: .short, timeStyle: .short)
-            cell.detailTextLabel?.text = "\(item.text)\nSaved at: \(dateStr)"
-            cell.detailTextLabel?.numberOfLines = 3
+            cell.textLabel?.text = "🗑 \(item.authorName)  •  \(item.chatTitle)"
+            cell.textLabel?.textColor = LightGramSettings.signatureYellowAccent
+            
+            var body = item.text
+            if let mediaDesc = item.mediaDescription {
+                body = body.isEmpty ? "[\(mediaDesc)]" : "[\(mediaDesc)]\n\(body)"
+            }
+            cell.detailTextLabel?.text = "\(body)\nSaved at: \(dateStr)"
+            cell.selectionStyle = .default
         } else {
             if self.filteredEdits.isEmpty {
-                cell.textLabel?.text = "No edited messages captured yet."
-                cell.detailTextLabel?.text = "Previous versions of edited messages appear here."
+                cell.textLabel?.text = "No edit history captured"
+                cell.detailTextLabel?.text = self.editRecords.isEmpty ?
+                    "When messages in your chats are edited, previous versions are preserved here." :
+                    "No edited messages match your search filter."
                 cell.textLabel?.textColor = UIColor(white: 0.5, alpha: 1.0)
                 cell.selectionStyle = .none
                 return cell
             }
             let item = self.filteredEdits[indexPath.row]
-            cell.textLabel?.text = "✏️ [Rev \(item.revision)] \(item.authorName)"
+            let dateStr = DateFormatter.localizedString(from: Date(timeIntervalSince1970: TimeInterval(item.timestamp)), dateStyle: .short, timeStyle: .short)
+            cell.textLabel?.text = "✏️ [Rev \(item.revision)] \(item.authorName)  •  \(item.chatTitle)"
             cell.textLabel?.textColor = LightGramSettings.signatureYellowAccent
-            cell.detailTextLabel?.text = "Was: \"\(item.previousText)\"\nNow: \"\(item.newText)\""
-            cell.detailTextLabel?.numberOfLines = 3
+            cell.detailTextLabel?.text = "🔴 Was: \"\(item.previousText)\"\n🟢 Now: \"\(item.newText)\"\nEdited at: \(dateStr)"
+            cell.selectionStyle = .default
         }
         return cell
+    }
+    
+    public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        let isDeleted = self.segmentedControl.selectedSegmentIndex == 0
+        
+        if isDeleted {
+            guard !self.filteredDeleted.isEmpty && indexPath.row < self.filteredDeleted.count else { return }
+            let item = self.filteredDeleted[indexPath.row]
+            self.showDeletedDetail(item: item)
+        } else {
+            guard !self.filteredEdits.isEmpty && indexPath.row < self.filteredEdits.count else { return }
+            let item = self.filteredEdits[indexPath.row]
+            self.showEditDetail(item: item)
+        }
+    }
+    
+    private func showDeletedDetail(item: SpyDeletedMessageRecord) {
+        let origDate = DateFormatter.localizedString(from: Date(timeIntervalSince1970: TimeInterval(item.originalTimestamp)), dateStyle: .medium, timeStyle: .medium)
+        let delDate = DateFormatter.localizedString(from: Date(timeIntervalSince1970: TimeInterval(item.deletionTimestamp)), dateStyle: .medium, timeStyle: .medium)
+        
+        var messageInfo = "Chat: \(item.chatTitle)\nAuthor: \(item.authorName)\nSent: \(origDate)\nDeleted: \(delDate)\n\n"
+        if let mediaDesc = item.mediaDescription {
+            messageInfo += "Media: [\(mediaDesc)]\n\n"
+        }
+        messageInfo += "Message Text:\n\(item.text.isEmpty ? "(No text content)" : item.text)"
+        
+        let alert = UIAlertController(title: "Deleted Message Details", message: messageInfo, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Copy Text", style: .default, handler: { _ in
+            UIPasteboard.general.string = item.text
+        }))
+        alert.addAction(UIAlertAction(title: "Delete from Archive", style: .destructive, handler: { [weak self] _ in
+            LightGramSpyManager.shared.deleteRecord(id: item.id, isDeletedMessage: true) {
+                self?.loadData()
+            }
+        }))
+        alert.addAction(UIAlertAction(title: "Close", style: .cancel))
+        self.present(alert, animated: true)
+    }
+    
+    private func showEditDetail(item: SpyEditRecord) {
+        let dateStr = DateFormatter.localizedString(from: Date(timeIntervalSince1970: TimeInterval(item.timestamp)), dateStyle: .medium, timeStyle: .medium)
+        let messageInfo = "Chat: \(item.chatTitle)\nAuthor: \(item.authorName)\nRevision: \(item.revision)\nEdited: \(dateStr)\n\nPrevious Text:\n\(item.previousText)\n\nCurrent Text:\n\(item.newText)"
+        
+        let alert = UIAlertController(title: "Message Edit Details", message: messageInfo, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Copy Previous Text", style: .default, handler: { _ in
+            UIPasteboard.general.string = item.previousText
+        }))
+        alert.addAction(UIAlertAction(title: "Copy Current Text", style: .default, handler: { _ in
+            UIPasteboard.general.string = item.newText
+        }))
+        alert.addAction(UIAlertAction(title: "Delete from Archive", style: .destructive, handler: { [weak self] _ in
+            LightGramSpyManager.shared.deleteRecord(id: item.id, isDeletedMessage: false) {
+                self?.loadData()
+            }
+        }))
+        alert.addAction(UIAlertAction(title: "Close", style: .cancel))
+        self.present(alert, animated: true)
+    }
+    
+    public func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
+        let isDeleted = self.segmentedControl.selectedSegmentIndex == 0
+        if isDeleted {
+            return !self.filteredDeleted.isEmpty
+        } else {
+            return !self.filteredEdits.isEmpty
+        }
+    }
+    
+    public func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+        guard editingStyle == .delete else { return }
+        let isDeleted = self.segmentedControl.selectedSegmentIndex == 0
+        
+        if isDeleted {
+            guard indexPath.row < self.filteredDeleted.count else { return }
+            let item = self.filteredDeleted[indexPath.row]
+            LightGramSpyManager.shared.deleteRecord(id: item.id, isDeletedMessage: true) { [weak self] in
+                self?.loadData()
+            }
+        } else {
+            guard indexPath.row < self.filteredEdits.count else { return }
+            let item = self.filteredEdits[indexPath.row]
+            LightGramSpyManager.shared.deleteRecord(id: item.id, isDeletedMessage: false) { [weak self] in
+                self?.loadData()
+            }
+        }
     }
 }

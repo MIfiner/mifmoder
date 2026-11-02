@@ -4622,11 +4622,19 @@ func replayFinalState(
             case let .DeleteEphemeralMessages(peerId, ids):
                 deleteEphemeralMessages(transaction: transaction, peerId: peerId, ids: ids)
             case let .DeleteMessagesWithGlobalIds(ids):
+                if LightGramSettings.shared.saveDeletedMessages {
+                    let messageIds = transaction.messageIdsForGlobalIds(ids)
+                    for id in messageIds {
+                        if let message = transaction.getMessage(id) {
+                            LightGramSpyManager.shared.recordDeletedMessage(from: message, in: transaction)
+                        }
+                    }
+                }
                 var resourceIds: [MediaResourceId] = []
                 transaction.deleteMessagesWithGlobalIds(ids, forEachMedia: { media in
                     addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)
                 })
-                if !resourceIds.isEmpty {
+                if !resourceIds.isEmpty && !LightGramSettings.shared.isSpyModeEnabled {
                     let _ = mediaBox.removeCachedResources(Array(Set(resourceIds)), force: true).start()
                 }
                 deletedMessageIds.append(contentsOf: ids.map { .global($0) })
@@ -4668,6 +4676,11 @@ func replayFinalState(
                     invalidateGroupStats.insert(Namespaces.PeerGroup.archive)
                 }
             case let .EditMessage(id, message):
+                if LightGramSettings.shared.saveEditHistory {
+                    if let previousMessage = transaction.getMessage(id) {
+                        LightGramSpyManager.shared.recordEditedMessage(previousMessage: previousMessage, newMessage: message, in: transaction)
+                    }
+                }
                 var generatedEvent: (reactionAuthor: Peer, reaction: MessageReaction.Reaction, message: Message, timestamp: Int32)?
                 transaction.updateMessage(id, update: { previousMessage in
                     let peers: [PeerId:Peer] = previousMessage.peers.reduce([:], { current, value in

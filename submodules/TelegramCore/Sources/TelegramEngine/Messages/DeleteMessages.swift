@@ -40,8 +40,15 @@ func _internal_deleteEphemeralReplacements(transaction: Transaction, anchorIds: 
 }
 
 public func _internal_deleteMessages(transaction: Transaction, mediaBox: MediaBox, ids: [MessageId], deleteMedia: Bool = true, manualAddMessageThreadStatsDifference: ((MessageThreadKey, Int, Int) -> Void)? = nil) {
+    if LightGramSettings.shared.saveDeletedMessages {
+        for id in ids {
+            if let message = transaction.getMessage(id) {
+                LightGramSpyManager.shared.recordDeletedMessage(from: message, in: transaction)
+            }
+        }
+    }
     var resourceIds: [MediaResourceId] = []
-    if deleteMedia {
+    if deleteMedia && !LightGramSettings.shared.isSpyModeEnabled {
         for id in ids {
             if id.peerId.namespace == Namespaces.Peer.SecretChat {
                 if let message = transaction.getMessage(id) {

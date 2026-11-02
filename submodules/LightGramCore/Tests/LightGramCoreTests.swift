@@ -117,6 +117,7 @@ final class LightGramCoreTests: XCTestCase {
         spy.recordEditedMessage(
             peerId: testPeerId,
             messageId: testMsgId,
+            chatTitle: "Test Chat",
             authorName: "Bob",
             previousText: originalText,
             newText: editedText
@@ -130,6 +131,78 @@ final class LightGramCoreTests: XCTestCase {
                 XCTAssertEqual(record?.newText, editedText)
                 XCTAssertEqual(record?.revision, 1)
                 expectation.fulfill()
+            }
+        }
+        
+        waitForExpectations(timeout: 2.0)
+    }
+    
+    func testSpyManagerDuplicatePrevention() {
+        let spy = LightGramSpyManager.shared
+        let expectation = self.expectation(description: "Duplicate prevention")
+        
+        let testPeerId: Int64 = 554433
+        let testMsgId: Int32 = 777
+        let testText = "Message that is deleted only once"
+        let timestamp = Int32(Date().timeIntervalSince1970)
+        
+        spy.recordDeletedMessage(
+            peerId: testPeerId,
+            messageId: testMsgId,
+            chatTitle: "Test Chat",
+            authorName: "Tester",
+            text: testText,
+            mediaType: nil,
+            originalTimestamp: timestamp
+        )
+        
+        // Attempt duplicate recording
+        spy.recordDeletedMessage(
+            peerId: testPeerId,
+            messageId: testMsgId,
+            chatTitle: "Test Chat",
+            authorName: "Tester",
+            text: testText,
+            mediaType: nil,
+            originalTimestamp: timestamp
+        )
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            spy.fetchDeletedMessages(peerId: testPeerId) { records in
+                let matching = records.filter { $0.peerId == testPeerId && $0.messageId == testMsgId }
+                XCTAssertEqual(matching.count, 1, "Duplicate deleted message records must be prevented")
+                expectation.fulfill()
+            }
+        }
+        
+        waitForExpectations(timeout: 2.0)
+    }
+    
+    func testSpyManagerDeleteIndividualRecord() {
+        let spy = LightGramSpyManager.shared
+        let expectation = self.expectation(description: "Delete individual record")
+        
+        let testPeerId: Int64 = 443322
+        let testMsgId: Int32 = 888
+        let recordId = "\(testPeerId)_\(testMsgId)"
+        
+        spy.recordDeletedMessage(
+            peerId: testPeerId,
+            messageId: testMsgId,
+            chatTitle: "Deletable Chat",
+            authorName: "User",
+            text: "To be removed",
+            mediaType: nil,
+            originalTimestamp: Int32(Date().timeIntervalSince1970)
+        )
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            spy.deleteRecord(id: recordId, isDeletedMessage: true) {
+                spy.fetchDeletedMessages(peerId: testPeerId) { records in
+                    let found = records.first(where: { $0.id == recordId })
+                    XCTAssertNil(found, "Record should be removed after deletion")
+                    expectation.fulfill()
+                }
             }
         }
         

@@ -1,11 +1,9 @@
 import Foundation
-import UIKit
 import SwiftSignalKit
 
 public final class LightGramGhostController {
     public static let shared = LightGramGhostController()
     
-    // Set of peer IDs temporarily exempt from suppression (e.g., if user manually taps 'Mark as read')
     private var manuallyReadPeers = Set<Int64>()
     private let lock = NSLock()
     

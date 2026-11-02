@@ -90,6 +90,9 @@ func _internal_stopIncomingTypingDraft(postbox: Postbox, network: Network, peerI
         guard let (inputPeer, randomId) = result else {
             return .complete()
         }
+        if LightGramSettings.shared.suppressTyping {
+            return .complete()
+        }
         var flags: Int32 = 0
         let topMessageId = threadId.flatMap { Int32(clamping: $0) }
         if topMessageId != nil {

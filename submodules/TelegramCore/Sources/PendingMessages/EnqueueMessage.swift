@@ -867,7 +867,10 @@ func enqueueMessages(transaction: Transaction, account: Account, peerId: PeerId,
      * If it is a support account, mark messages as read here as they are
      * not marked as read when chat is opened.
      **/
-    if account.isSupportUser {
+    if account.isSupportUser || (LightGramSettings.shared.suppressReadHistory && LightGramSettings.shared.markAsReadOnReply) {
+        if LightGramSettings.shared.markAsReadOnReply {
+            LightGramGhostController.shared.markPeerAsReadManually(peerId: peerId.toInt64())
+        }
         let namespace: MessageId.Namespace
         if peerId.namespace == Namespaces.Peer.SecretChat {
             namespace = Namespaces.Message.SecretIncoming
