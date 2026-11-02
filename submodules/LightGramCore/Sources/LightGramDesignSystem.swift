@@ -40,6 +40,7 @@ public enum LightGramDesignSystem {
         
         /// Success / Online Green
         public static let onlineGreen = UIColor(rgb: 0x34C759)
+        public static let successGreen = UIColor(rgb: 0x34C759)
     }
     
     // MARK: - Corner Radii
@@ -62,6 +63,7 @@ public enum LightGramDesignSystem {
         public static let bodyMedium = UIFont.systemFont(ofSize: 15, weight: .medium)
         public static let subheadline = UIFont.systemFont(ofSize: 13, weight: .regular)
         public static let subheadlineMedium = UIFont.systemFont(ofSize: 13, weight: .medium)
+        public static let footnote = UIFont.systemFont(ofSize: 13, weight: .regular)
         public static let caption = UIFont.systemFont(ofSize: 11, weight: .medium)
         public static let badge = UIFont.systemFont(ofSize: 11, weight: .bold)
     }
@@ -72,6 +74,18 @@ public enum LightGramDesignSystem {
             let generator = UIImpactFeedbackGenerator(style: style)
             generator.prepare()
             generator.impactOccurred()
+        }
+        
+        public static func light() {
+            impact(.light)
+        }
+        
+        public static func medium() {
+            impact(.medium)
+        }
+        
+        public static func heavy() {
+            impact(.heavy)
         }
         
         public static func selection() {
