@@ -208,4 +208,82 @@ final class LightGramCoreTests: XCTestCase {
         
         waitForExpectations(timeout: 2.0)
     }
+    
+    func testSpyManagerFastLookups() {
+        let spy = LightGramSpyManager.shared
+        let peerId: Int64 = 776655
+        let messageId: Int32 = 999
+        
+        XCTAssertFalse(spy.isMessageDeleted(peerId: peerId, messageId: messageId))
+        
+        spy.markMessageAsDeleted(peerId: peerId, messageId: messageId, originalTimestamp: 1000, chatTitle: "Test Chat", authorName: "Alice", text: "Secret")
+        
+        XCTAssertTrue(spy.isMessageDeleted(peerId: peerId, messageId: messageId))
+        let record = spy.getDeletedRecord(peerId: peerId, messageId: messageId)
+        XCTAssertNotNil(record)
+        XCTAssertEqual(record?.peerId, peerId)
+        XCTAssertEqual(record?.messageId, messageId)
+    }
+    
+    func testNotesManagerCRUD() {
+        let notesManager = LightGramNotesManager.shared
+        let expectation = self.expectation(description: "Notes CRUD")
+        
+        let testPeer: Int64 = 112233
+        let testMsgId: Int32 = 333
+        let noteText = "Important reminder for project launch"
+        
+        notesManager.addNote(peerId: testPeer, messageId: testMsgId, chatTitle: "Dev Group", authorName: "Lead", originalText: "Launch tomorrow", noteText: noteText) {
+            notesManager.fetchAllNotes { notes in
+                let found = notes.first(where: { $0.peerId == testPeer && $0.messageId == testMsgId })
+                XCTAssertNotNil(found)
+                XCTAssertEqual(found?.noteText, noteText)
+                
+                if let id = found?.id {
+                    notesManager.deleteNote(id: id) {
+                        notesManager.fetchAllNotes { notesAfter in
+                            let after = notesAfter.first(where: { $0.id == id })
+                            XCTAssertNil(after)
+                            expectation.fulfill()
+                        }
+                    }
+                }
+            }
+        }
+        
+        waitForExpectations(timeout: 2.0)
+    }
+    
+    func testRemindersManagerCRUD() {
+        let notesManager = LightGramNotesManager.shared
+        let expectation = self.expectation(description: "Reminders CRUD")
+        
+        let testPeer: Int64 = 445566
+        let testMsgId: Int32 = 444
+        let msgText = "Check server logs at midnight"
+        let remindDate = Date().addingTimeInterval(3600)
+        
+        notesManager.addReminder(peerId: testPeer, messageId: testMsgId, chatTitle: "Ops", messageText: msgText, remindAt: remindDate) {
+            notesManager.fetchAllReminders { reminders in
+                let found = reminders.first(where: { $0.peerId == testPeer && $0.messageId == testMsgId })
+                XCTAssertNotNil(found)
+                XCTAssertFalse(found?.isCompleted ?? true)
+                
+                if let id = found?.id {
+                    notesManager.toggleReminderCompleted(id: id) {
+                        notesManager.fetchAllReminders { remsAfter in
+                            let toggled = remsAfter.first(where: { $0.id == id })
+                            XCTAssertTrue(toggled?.isCompleted ?? false)
+                            
+                            notesManager.deleteReminder(id: id) {
+                                expectation.fulfill()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        waitForExpectations(timeout: 2.0)
+    }
 }

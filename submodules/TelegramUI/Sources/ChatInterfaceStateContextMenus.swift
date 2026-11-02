@@ -28,6 +28,7 @@ import TranslateUI
 import DebugSettingsUI
 import ChatPresentationInterfaceState
 import Pasteboard
+import LightGramCore
 import BrowserUI
 import ChatRichTextEditorComposer
 import SettingsUI
@@ -1451,6 +1452,52 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                             f(.default)
                         })))
                     }
+                    
+                    // LightGram V2 Message Tools: Save to Notes
+                    if !messageText.isEmpty {
+                        actions.append(.action(ContextMenuActionItem(text: "Save to Notes", icon: { theme in
+                            return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Pin"), color: theme.actionSheet.primaryTextColor)
+                        }, action: { _, f in
+                            let chatTitle = chatPresentationInterfaceState.renderedPeer?.chatMainPeer?.debugDisplayTitle ?? "Chat"
+                            let authorName = message.author?.debugDisplayTitle ?? "Unknown"
+                            LightGramNotesManager.shared.addNote(peerId: message.id.peerId.toInt64(), messageId: message.id.id, chatTitle: chatTitle, authorName: authorName, originalText: messageText, noteText: messageText) {
+                                let content: UndoOverlayContent = .copy(text: "Saved to LightGram Notes")
+                                controllerInteraction.displayUndo(content)
+                            }
+                            f(.default)
+                        })))
+                    }
+                    
+                    // LightGram V2 Spy Mode: View Deleted / Edit History Details
+                    let spyPeerId = message.id.peerId.toInt64()
+                    let isSpyDeleted = LightGramSpyManager.shared.isMessageDeleted(peerId: spyPeerId, messageId: message.id.id)
+                    let spyEdits = LightGramSpyManager.shared.getEditRecords(peerId: spyPeerId, messageId: message.id.id)
+                    if isSpyDeleted || !spyEdits.isEmpty {
+                        let spyTitle = isSpyDeleted ? "Deleted Message Details" : "Edit Revisions (\(spyEdits.count))"
+                        actions.append(.action(ContextMenuActionItem(text: spyTitle, textColor: isSpyDeleted ? .destructive : .primary, icon: { theme in
+                            return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Info"), color: isSpyDeleted ? UIColor(rgb: 0xFF3B30) : UIColor(rgb: 0xEDB400))
+                        }, action: { _, f in
+                            var infoText = ""
+                            if isSpyDeleted, let record = LightGramSpyManager.shared.getDeletedRecord(peerId: spyPeerId, messageId: message.id.id) {
+                                let delDate = DateFormatter.localizedString(from: Date(timeIntervalSince1970: TimeInterval(record.deletionTimestamp)), dateStyle: .short, timeStyle: .short)
+                                infoText += "🗑 Message was deleted by \(record.authorName) at \(delDate).\nOriginal Text:\n\"\(record.text)\"\n\n"
+                            }
+                            if !spyEdits.isEmpty {
+                                infoText += "✏️ Edit Revisions History:\n"
+                                for rev in spyEdits {
+                                    let editDate = DateFormatter.localizedString(from: Date(timeIntervalSince1970: TimeInterval(rev.timestamp)), dateStyle: .short, timeStyle: .short)
+                                    infoText += "Rev \(rev.revision) (\(editDate)):\nWas: \"\(rev.previousText)\"\nNow: \"\(rev.newText)\"\n\n"
+                                }
+                            }
+                            let alert = UIAlertController(title: "Spy Mode Details", message: infoText, preferredStyle: .alert)
+                            alert.addAction(UIAlertAction(title: "Copy Original", style: .default, handler: { _ in
+                                UIPasteboard.general.string = isSpyDeleted ? (LightGramSpyManager.shared.getDeletedRecord(peerId: spyPeerId, messageId: message.id.id)?.text ?? "") : (spyEdits.first?.previousText ?? "")
+                            }))
+                            alert.addAction(UIAlertAction(title: "OK", style: .cancel))
+                            controllerInteraction.presentGlobalOverlayController(alert, nil)
+                            f(.default)
+                        })))
+                    }
                 }
                 
                 var showTranslateIfTopical = false
@@ -2406,6 +2453,52 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                             interfaceInteraction.setupEditMessage(messages[0].id, { transition in
                                 f(.custom(transition))
                             })
+                        })))
+                    }
+                    
+                    // LightGram V2 Message Tools: Save to Notes
+                    if !messageText.isEmpty {
+                        actions.append(.action(ContextMenuActionItem(text: "Save to Notes", icon: { theme in
+                            return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Pin"), color: theme.actionSheet.primaryTextColor)
+                        }, action: { _, f in
+                            let chatTitle = chatPresentationInterfaceState.renderedPeer?.chatMainPeer?.debugDisplayTitle ?? "Chat"
+                            let authorName = message.author?.debugDisplayTitle ?? "Unknown"
+                            LightGramNotesManager.shared.addNote(peerId: message.id.peerId.toInt64(), messageId: message.id.id, chatTitle: chatTitle, authorName: authorName, originalText: messageText, noteText: messageText) {
+                                let content: UndoOverlayContent = .copy(text: "Saved to LightGram Notes")
+                                controllerInteraction.displayUndo(content)
+                            }
+                            f(.default)
+                        })))
+                    }
+                    
+                    // LightGram V2 Spy Mode: View Deleted / Edit History Details
+                    let spyPeerId = message.id.peerId.toInt64()
+                    let isSpyDeleted = LightGramSpyManager.shared.isMessageDeleted(peerId: spyPeerId, messageId: message.id.id)
+                    let spyEdits = LightGramSpyManager.shared.getEditRecords(peerId: spyPeerId, messageId: message.id.id)
+                    if isSpyDeleted || !spyEdits.isEmpty {
+                        let spyTitle = isSpyDeleted ? "Deleted Message Details" : "Edit Revisions (\(spyEdits.count))"
+                        actions.append(.action(ContextMenuActionItem(text: spyTitle, textColor: isSpyDeleted ? .destructive : .primary, icon: { theme in
+                            return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Info"), color: isSpyDeleted ? UIColor(rgb: 0xFF3B30) : UIColor(rgb: 0xEDB400))
+                        }, action: { _, f in
+                            var infoText = ""
+                            if isSpyDeleted, let record = LightGramSpyManager.shared.getDeletedRecord(peerId: spyPeerId, messageId: message.id.id) {
+                                let delDate = DateFormatter.localizedString(from: Date(timeIntervalSince1970: TimeInterval(record.deletionTimestamp)), dateStyle: .short, timeStyle: .short)
+                                infoText += "🗑 Message was deleted by \(record.authorName) at \(delDate).\nOriginal Text:\n\"\(record.text)\"\n\n"
+                            }
+                            if !spyEdits.isEmpty {
+                                infoText += "✏️ Edit Revisions History:\n"
+                                for rev in spyEdits {
+                                    let editDate = DateFormatter.localizedString(from: Date(timeIntervalSince1970: TimeInterval(rev.timestamp)), dateStyle: .short, timeStyle: .short)
+                                    infoText += "Rev \(rev.revision) (\(editDate)):\nWas: \"\(rev.previousText)\"\nNow: \"\(rev.newText)\"\n\n"
+                                }
+                            }
+                            let alert = UIAlertController(title: "Spy Mode Details", message: infoText, preferredStyle: .alert)
+                            alert.addAction(UIAlertAction(title: "Copy Original", style: .default, handler: { _ in
+                                UIPasteboard.general.string = isSpyDeleted ? (LightGramSpyManager.shared.getDeletedRecord(peerId: spyPeerId, messageId: message.id.id)?.text ?? "") : (spyEdits.first?.previousText ?? "")
+                            }))
+                            alert.addAction(UIAlertAction(title: "OK", style: .cancel))
+                            controllerInteraction.presentGlobalOverlayController(alert, nil)
+                            f(.default)
                         })))
                     }
                 }

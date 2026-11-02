@@ -90,6 +90,10 @@ public final class LightGramSpyManager {
     private var editedMessagesCache: [SpyEditRecord] = []
     private var hasLoadedCache = false
     
+    private var deletedMap: [String: SpyDeletedMessageRecord] = [:]
+    private var editedMap: [String: [SpyEditRecord]] = [:]
+    private let mapLock = NSLock()
+    
     public init() {
         let fileManager = FileManager.default
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSTemporaryDirectory())
@@ -115,19 +119,75 @@ public final class LightGramSpyManager {
         self.queue.async { [weak self] in
             guard let self = self else { return }
             
+            var loadedDeleted: [SpyDeletedMessageRecord] = []
             if let deletedData = try? Data(contentsOf: self.deletedMessagesFile),
                let records = try? JSONDecoder().decode([SpyDeletedMessageRecord].self, from: deletedData) {
+                loadedDeleted = records
                 self.deletedMessagesCache = records
             }
             
+            var loadedEdits: [SpyEditRecord] = []
             if let editedData = try? Data(contentsOf: self.editedMessagesFile),
                let records = try? JSONDecoder().decode([SpyEditRecord].self, from: editedData) {
+                loadedEdits = records
                 self.editedMessagesCache = records
             }
+            
+            self.mapLock.lock()
+            self.deletedMap.removeAll()
+            for record in loadedDeleted {
+                self.deletedMap[record.id] = record
+            }
+            self.editedMap.removeAll()
+            for record in loadedEdits {
+                let key = "\(record.peerId)_\(record.messageId)"
+                var list = self.editedMap[key] ?? []
+                list.append(record)
+                self.editedMap[key] = list
+            }
+            self.mapLock.unlock()
             
             self.hasLoadedCache = true
             self.enforceTTL()
         }
+    }
+    
+    // MARK: - Synchronous Fast Lookups for Chat Bubbles
+    public func isMessageDeleted(peerId: Int64, messageId: Int32) -> Bool {
+        self.mapLock.lock()
+        defer { self.mapLock.unlock() }
+        return self.deletedMap["\(peerId)_\(messageId)"] != nil
+    }
+    
+    public func getDeletedRecord(peerId: Int64, messageId: Int32) -> SpyDeletedMessageRecord? {
+        self.mapLock.lock()
+        defer { self.mapLock.unlock() }
+        return self.deletedMap["\(peerId)_\(messageId)"]
+    }
+    
+    public func getEditRecords(peerId: Int64, messageId: Int32) -> [SpyEditRecord] {
+        self.mapLock.lock()
+        defer { self.mapLock.unlock() }
+        return self.editedMap["\(peerId)_\(messageId)"] ?? []
+    }
+    
+    public func markMessageAsDeleted(peerId: Int64, messageId: Int32, originalTimestamp: Int32 = 0, chatTitle: String = "Chat", authorName: String = "Unknown", text: String = "", mediaType: String? = nil, mediaDescription: String? = nil) {
+        let key = "\(peerId)_\(messageId)"
+        let now = Int32(Date().timeIntervalSince1970)
+        let record = SpyDeletedMessageRecord(
+            peerId: peerId,
+            messageId: messageId,
+            chatTitle: chatTitle,
+            authorName: authorName,
+            text: text,
+            mediaType: mediaType,
+            mediaDescription: mediaDescription,
+            originalTimestamp: originalTimestamp,
+            deletionTimestamp: now
+        )
+        self.mapLock.lock()
+        self.deletedMap[key] = record
+        self.mapLock.unlock()
     }
     
     private func persistDeletedMessages() {
@@ -227,8 +287,14 @@ public final class LightGramSpyManager {
                 self.deletedMessagesCache.insert(record, at: 0)
                 // Cap cache to 10,000 items
                 if self.deletedMessagesCache.count > 10000 {
-                    self.deletedMessagesCache.removeLast()
+                    let removed = self.deletedMessagesCache.removeLast()
+                    self.mapLock.lock()
+                    self.deletedMap.removeValue(forKey: removed.id)
+                    self.mapLock.unlock()
                 }
+                self.mapLock.lock()
+                self.deletedMap[record.id] = record
+                self.mapLock.unlock()
                 self.persistDeletedMessages()
             }
         }
@@ -282,6 +348,12 @@ public final class LightGramSpyManager {
             if self.editedMessagesCache.count > 10000 {
                 self.editedMessagesCache.removeLast()
             }
+            let key = "\(peerId)_\(messageId)"
+            self.mapLock.lock()
+            var list = self.editedMap[key] ?? []
+            list.append(record)
+            self.editedMap[key] = list
+            self.mapLock.unlock()
             self.persistEditedMessages()
         }
     }
@@ -348,9 +420,17 @@ public final class LightGramSpyManager {
             }
             if isDeletedMessage {
                 self.deletedMessagesCache.removeAll(where: { $0.id == id })
+                self.mapLock.lock()
+                self.deletedMap.removeValue(forKey: id)
+                self.mapLock.unlock()
                 self.persistDeletedMessages()
             } else {
                 self.editedMessagesCache.removeAll(where: { $0.id == id })
+                self.mapLock.lock()
+                for (k, v) in self.editedMap {
+                    self.editedMap[k] = v.filter { $0.id != id }
+                }
+                self.mapLock.unlock()
                 self.persistEditedMessages()
             }
             DispatchQueue.main.async { completion() }
@@ -381,6 +461,10 @@ public final class LightGramSpyManager {
             guard let self = self else { return }
             self.deletedMessagesCache.removeAll()
             self.editedMessagesCache.removeAll()
+            self.mapLock.lock()
+            self.deletedMap.removeAll()
+            self.editedMap.removeAll()
+            self.mapLock.unlock()
             try? FileManager.default.removeItem(at: self.deletedMessagesFile)
             try? FileManager.default.removeItem(at: self.editedMessagesFile)
             DispatchQueue.main.async {

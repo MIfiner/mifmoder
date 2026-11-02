@@ -146,7 +146,7 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         case .spyMode: return 5
         case .privacyAndSecurity: return 2
         case .smartFilters: return 1
-        case .tools: return 2
+        case .tools: return 7
         }
     }
     
@@ -255,13 +255,30 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
             cell.accessoryView = sw
             
         case .tools:
-            if indexPath.row == 0 {
+            switch indexPath.row {
+            case 0:
+                cell.textLabel?.text = "Control Center (AMOLED Dashboard)"
+                cell.accessoryType = .disclosureIndicator
+            case 1:
+                cell.textLabel?.text = "Smart Folders"
+                cell.accessoryType = .disclosureIndicator
+            case 2:
+                cell.textLabel?.text = "Message Notes & Reminders"
+                cell.accessoryType = .disclosureIndicator
+            case 3:
+                cell.textLabel?.text = "Media & Storage Center"
+                cell.accessoryType = .disclosureIndicator
+            case 4:
+                cell.textLabel?.text = "Privacy & Security Center"
+                cell.accessoryType = .disclosureIndicator
+            case 5:
                 cell.textLabel?.text = "Group & Bot Tools"
                 cell.accessoryType = .disclosureIndicator
-            } else {
+            case 6:
                 cell.textLabel?.text = "Network Diagnostics"
                 cell.detailTextLabel?.text = "NWConnection / DC 2"
                 cell.accessoryType = .disclosureIndicator
+            default: break
             }
         }
         
@@ -288,11 +305,22 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
             let archiveVC = LightGramSpyArchiveController()
             self.push(archiveVC)
         } else if s == .tools {
-            if indexPath.row == 0 {
-                let toolsVC = LightGramToolsController()
-                self.push(toolsVC)
-            } else if indexPath.row == 1 {
-                self.showNetworkDiagnostics()
+            switch indexPath.row {
+            case 0:
+                self.push(LightGramControlCenterController())
+            case 1:
+                self.push(LightGramSmartFoldersController())
+            case 2:
+                self.push(LightGramNotesController())
+            case 3:
+                self.push(LightGramMediaCenterController())
+            case 4:
+                self.push(LightGramPrivacyCenterController())
+            case 5:
+                self.push(LightGramBotManagerController())
+            case 6:
+                self.push(LightGramNetworkDiagnosticsController())
+            default: break
             }
         }
     }
