@@ -572,6 +572,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         self.clearNotificationsManager = clearNotificationsManager
         
         let appVersion = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "unknown"
+        print("[LightGram Launch] Application version: \(appVersion)")
         
         let baseAppBundleId = Bundle.main.bundleIdentifier!
         let appGroupName = "group.\(baseAppBundleId)"
