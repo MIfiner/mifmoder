@@ -96,9 +96,9 @@ public final class LightGramSpyArchiveController: ViewController, UITableViewDat
                             self?.loadData()
                         } else {
                             if let navigationController = self?.navigationController as? NavigationController {
-                                navigationController.popViewController(animated: true)
+                                let _ = navigationController.popViewController(animated: true)
                             } else {
-                                self?.navigationController?.popViewController(animated: true)
+                                let _ = self?.navigationController?.popViewController(animated: true)
                             }
                         }
                     }

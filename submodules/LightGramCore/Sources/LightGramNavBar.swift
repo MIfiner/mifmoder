@@ -3,7 +3,7 @@ import UIKit
 import Display
 
 func makeLightGramNavBarData() -> NavigationBarPresentationData? {
-    if let defaultNavigationBarImpl = defaultNavigationBarImpl {
+    if defaultNavigationBarImpl != nil {
         let theme = NavigationBarTheme(
             overallDarkAppearance: true,
             buttonColor: LightGramSettings.signatureYellowAccent,

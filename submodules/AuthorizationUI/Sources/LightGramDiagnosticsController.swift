@@ -2,7 +2,6 @@ import Foundation
 import UIKit
 import Display
 import AsyncDisplayKit
-import SwiftSignalKit
 import TelegramCore
 import TelegramPresentationData
 import AccountContext
@@ -10,6 +9,7 @@ import Network
 
 public final class LightGramDiagnosticsController: ViewController {
     private let presentationData: PresentationData
+    private var scrollView: UIScrollView?
     private var textView: UITextView?
     private var statusLabel: UILabel?
     private var pingStatusLabel: UILabel?
@@ -50,7 +50,11 @@ public final class LightGramDiagnosticsController: ViewController {
         
         let alert = UIAlertController(title: "Copied", message: "Network diagnostics copied to clipboard.", preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
-        self.present(alert, animated: true, completion: nil)
+        if let rootViewController = self.view.window?.rootViewController {
+            rootViewController.present(alert, animated: true, completion: nil)
+        } else {
+            self.present(alert, animated: true, completion: nil)
+        }
     }
     
     @objc private func sharePressed() {
@@ -60,7 +64,11 @@ public final class LightGramDiagnosticsController: ViewController {
             popover.sourceView = self.view
             popover.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
         }
-        self.present(activityController, animated: true, completion: nil)
+        if let rootViewController = self.view.window?.rootViewController {
+            rootViewController.present(activityController, animated: true, completion: nil)
+        } else {
+            self.present(activityController, animated: true, completion: nil)
+        }
     }
     
     private func generateFullReport() -> String {
@@ -71,7 +79,7 @@ public final class LightGramDiagnosticsController: ViewController {
         let model = device.model
         let logLines = Logger.shared.getRecentLogLines()
         
-        var report = """
+        let report = """
         === LightGram V1 Network Diagnostic Report ===
         App Version: \(appVersion)
         Bundle ID: \(bundleId)
@@ -103,9 +111,7 @@ public final class LightGramDiagnosticsController: ViewController {
         let scrollView = UIScrollView()
         scrollView.alwaysBounceVertical = true
         self.view.addSubview(scrollView)
-        
-        let container = UIView()
-        scrollView.addSubview(container)
+        self.scrollView = scrollView
         
         let appVersion = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0"
         let statusLabel = UILabel()
@@ -118,7 +124,7 @@ public final class LightGramDiagnosticsController: ViewController {
         Target: Telegram DC 2 (149.154.167.50:443)
         Seeds: DC1 (149.154.175.50), DC4 (149.154.167.91)
         """
-        container.addSubview(statusLabel)
+        scrollView.addSubview(statusLabel)
         self.statusLabel = statusLabel
         
         let pingStatusLabel = UILabel()
@@ -126,21 +132,21 @@ public final class LightGramDiagnosticsController: ViewController {
         pingStatusLabel.font = UIFont.monospacedSystemFont(ofSize: 12, weight: .medium)
         pingStatusLabel.textColor = self.presentationData.theme.list.itemSecondaryTextColor
         pingStatusLabel.text = "Testing connectivity to Telegram..."
-        container.addSubview(pingStatusLabel)
+        scrollView.addSubview(pingStatusLabel)
         self.pingStatusLabel = pingStatusLabel
         
         let testButton = UIButton(type: .system)
         testButton.setTitle("Retest Connection", for: .normal)
         testButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         testButton.addTarget(self, action: #selector(self.runPingTest), for: .touchUpInside)
-        container.addSubview(testButton)
+        scrollView.addSubview(testButton)
         self.testButton = testButton
         
         let shareButton = UIButton(type: .system)
         shareButton.setTitle("Share Logs", for: .normal)
         shareButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         shareButton.addTarget(self, action: #selector(self.sharePressed), for: .touchUpInside)
-        container.addSubview(shareButton)
+        scrollView.addSubview(shareButton)
         self.shareButton = shareButton
         
         let textView = UITextView()
@@ -152,7 +158,7 @@ public final class LightGramDiagnosticsController: ViewController {
         textView.layer.masksToBounds = true
         let recentLogs = Logger.shared.getRecentLogLines()
         textView.text = recentLogs.isEmpty ? "No recent log events captured yet." : recentLogs.joined(separator: "\n")
-        container.addSubview(textView)
+        scrollView.addSubview(textView)
         self.textView = textView
         
         self.runPingTest()
@@ -162,12 +168,14 @@ public final class LightGramDiagnosticsController: ViewController {
         super.containerLayoutUpdated(layout, transition: transition)
         
         let bounds = CGRect(origin: CGPoint(), size: layout.size)
-        if let scrollView = self.view.subviews.first(where: { $0 is UIScrollView }) as? UIScrollView {
+        if let scrollView = self.scrollView {
             scrollView.frame = bounds
             
             let contentWidth = layout.size.width - 32.0
-            let insets = layout.insets(options: [.statusBar, .navBar, .input])
-            let topInset = insets.top + 16.0
+            let insets = layout.insets(options: [.statusBar, .input])
+            let navLayout = self.navigationLayout(layout: layout)
+            let navBarHeight = self.navigationBar != nil ? navLayout.navigationFrame.maxY : insets.top
+            let topInset = max(insets.top, navBarHeight) + 16.0
             
             self.statusLabel?.frame = CGRect(x: 16.0, y: topInset, width: contentWidth, height: 75.0)
             self.pingStatusLabel?.frame = CGRect(x: 16.0, y: topInset + 80.0, width: contentWidth, height: 60.0)
@@ -178,7 +186,8 @@ public final class LightGramDiagnosticsController: ViewController {
             let textViewHeight = max(200.0, layout.size.height - (topInset + 195.0) - insets.bottom - 16.0)
             self.textView?.frame = CGRect(x: 16.0, y: topInset + 190.0, width: contentWidth, height: textViewHeight)
             
-            scrollView.contentSize = CGSize(width: layout.size.width, height: topInset + 190.0 + textViewHeight + 20.0)
+            let totalContentHeight = topInset + 190.0 + textViewHeight + 20.0
+            scrollView.contentSize = CGSize(width: layout.size.width, height: totalContentHeight)
         }
     }
     
@@ -202,17 +211,19 @@ public final class LightGramDiagnosticsController: ViewController {
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 var text = ""
+                lock.lock()
                 for target in targets {
                     let res = results[target.0] ?? "Testing..."
                     text += "\(target.0) (\(target.1):443): \(res)\n"
                 }
+                lock.unlock()
                 self.pingStatusLabel?.text = text.trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
         
         for target in targets {
             let host = NWEndpoint.Host(target.1)
-            let port = NWEndpoint.Port(rawValue: target.2)!
+            guard let port = NWEndpoint.Port(rawValue: target.2) else { continue }
             let tcpOptions = NWProtocolTCP.Options()
             tcpOptions.enableFastOpen = false
             let params = NWParameters(tls: nil, tcp: tcpOptions)

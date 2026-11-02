@@ -155,8 +155,8 @@ public final class AuthorizationSequencePhoneEntryController: ViewController, MF
                     strongSelf.present(diagController, in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
                 }),
                 TextAlertAction(type: .genericAction, title: "Proxy Settings", action: { [weak self] in
-                    guard let strongSelf = self else { return }
-                    strongSelf.present(strongSelf.sharedContext.makeProxySettingsController(sharedContext: strongSelf.sharedContext, account: strongSelf.account), in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
+                    guard let strongSelf = self, let account = strongSelf.account else { return }
+                    strongSelf.present(strongSelf.sharedContext.makeProxySettingsController(sharedContext: strongSelf.sharedContext, account: account), in: .window(.root), with: ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
                 }),
                 TextAlertAction(type: .genericAction, title: "Telegram Debug Menu", action: { [weak self] in
                     guard let strongSelf = self else { return }
