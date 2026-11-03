@@ -4,7 +4,6 @@ import Display
 import TelegramPresentationData
 import AccountContext
 import SwiftSignalKit
-import Postbox
 import TelegramCore
 
 public final class LightGramStatisticsController: ViewController {
@@ -99,7 +98,7 @@ public final class LightGramStatisticsController: ViewController {
         self.isLoading = true
         self.activityIndicator.startAnimating()
         
-        LightGramStatisticsManager.shared.fetchStatistics(context: self.context, period: self.selectedPeriod, forceRefresh: forceRefresh) { [weak self] snapshot in
+        LightGramStatisticsManager.shared.fetchStatistics(account: self.context.account, period: self.selectedPeriod, forceRefresh: forceRefresh) { [weak self] snapshot in
             guard let self = self else { return }
             self.isLoading = false
             self.activityIndicator.stopAnimating()
@@ -406,14 +405,13 @@ public final class LightGramStatisticsController: ViewController {
     @objc private func topChatTapped(_ sender: UITapGestureRecognizer) {
         guard let view = sender.view else { return }
         let peerId = PeerId(Int64(view.tag))
-        let _ = (self.context.account.postbox.transaction { transaction -> Peer? in
-            return transaction.getPeer(peerId)
-        } |> deliverOnMainQueue).start(next: { [weak self] peer in
+        let _ = (self.context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: peerId))
+                 |> deliverOnMainQueue).start(next: { [weak self] peer in
             guard let self = self, let peer = peer else { return }
             self.context.sharedContext.navigateToChatController(NavigateToChatControllerParams(
                 navigationController: self.navigationController as? NavigationController,
                 context: self.context,
-                chatLocation: .peer(EnginePeer(peer)),
+                chatLocation: .peer(peer),
                 subject: nil,
                 useExisting: true
             ))

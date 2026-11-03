@@ -19,7 +19,6 @@ swift_library(
         "//submodules/ItemListUI:ItemListUI",
         "//submodules/PresentationDataUtils:PresentationDataUtils",
         "//submodules/AppBundle:AppBundle",
-        "//submodules/Postbox:Postbox",
     ],
     visibility = [
         "//visibility:public",
@@ -36,7 +35,6 @@ swift_library(
         ":LightGramCore",
         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
         "//submodules/TelegramCore:TelegramCore",
-        "//submodules/Postbox:Postbox",
         "//submodules/TelegramPresentationData:TelegramPresentationData",
     ],
 )

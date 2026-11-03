@@ -1,9 +1,7 @@
 import Foundation
 import UIKit
-import Postbox
-import TelegramCore
 import SwiftSignalKit
-import AccountContext
+import Postbox
 
 public enum StatisticsPeriod: Int, CaseIterable {
     case sevenDays = 0
@@ -137,7 +135,7 @@ public final class LightGramStatisticsManager {
     public init() {}
     
     public func fetchStatistics(
-        context: AccountContext,
+        account: Account,
         period: StatisticsPeriod,
         forceRefresh: Bool = false,
         completion: @escaping (LightGramStatisticsSnapshot) -> Void
@@ -169,7 +167,7 @@ public final class LightGramStatisticsManager {
                 daysInPeriod = 365
             }
             
-            let _ = (context.account.postbox.transaction { transaction -> LightGramStatisticsSnapshot in
+            let _ = (account.postbox.transaction { transaction -> LightGramStatisticsSnapshot in
                 var sentCount = 0
                 var receivedCount = 0
                 var photosCount = 0
@@ -219,7 +217,6 @@ public final class LightGramStatisticsManager {
                     
                     transaction.withAllMessages(peerId: peer.id) { message -> Bool in
                         if message.timestamp < minTimestamp {
-                            // If timestamp is earlier than period, continue scanning or stop if ordered
                             return true
                         }
                         

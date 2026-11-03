@@ -2,9 +2,8 @@ import Foundation
 import UIKit
 import Photos
 import LocalAuthentication
-import Postbox
-import TelegramCore
 import SwiftSignalKit
+import Postbox
 
 public struct MediaVaultItem: Codable, Equatable {
     public let id: String
@@ -124,7 +123,7 @@ public final class LightGramMediaVaultManager {
         authorName: String,
         media: Media,
         isOneTime: Bool,
-        postbox: Postbox,
+        account: Account,
         completion: @escaping (Bool, String?) -> Void
     ) {
         self.queue.async {
@@ -199,12 +198,12 @@ public final class LightGramMediaVaultManager {
             }
             
             // Find cached file in Postbox mediaBox
-            let cachedPath = postbox.mediaBox.cachedResourcePath(resource.id)
+            let cachedPath = account.postbox.mediaBox.cachedResourcePath(resource.id)
             let fileManager = FileManager.default
             
             guard fileManager.fileExists(atPath: cachedPath) else {
                 // If not cached locally, read data stream
-                let dataPath = postbox.mediaBox.resourceData(resource.id, pathExtension: extensionName, waitUntilFetchStatus: true)
+                let dataPath = account.postbox.mediaBox.resourceData(resource.id, pathExtension: extensionName, waitUntilFetchStatus: true)
                 let _ = (dataPath |> take(1)).start(next: { data in
                     if data.complete, let sourcePath = data.path {
                         self.copyAndStoreItem(

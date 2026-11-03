@@ -1608,7 +1608,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                             authorName: authorTitle,
                             media: targetMedia,
                             isOneTime: isSecretOrOneTime,
-                            postbox: context.account.postbox
+                            account: context.account
                         ) { success, msg in
                             Queue.mainQueue().after(0.2) {
                                 let presentationData = context.sharedContext.currentPresentationData.with { $0 }
