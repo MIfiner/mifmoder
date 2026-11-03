@@ -271,7 +271,11 @@ public final class LightGramStatisticsManager {
                         }
                         var type = "user"
                         if let channel = peer as? TelegramChannel {
-                            type = channel.isGroup ? "group" : "channel"
+                            if case .group = channel.info {
+                                type = "group"
+                            } else {
+                                type = "channel"
+                            }
                         } else if peer is TelegramGroup {
                             type = "group"
                         }

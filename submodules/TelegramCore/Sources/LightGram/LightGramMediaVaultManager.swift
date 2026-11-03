@@ -198,53 +198,53 @@ public final class LightGramMediaVaultManager {
             }
             
             // Find cached file in Postbox mediaBox
-            let cachedPath = account.postbox.mediaBox.cachedResourcePath(resource.id)
             let fileManager = FileManager.default
+            let cachedPath = account.postbox.mediaBox.completedResourcePath(resource)
             
-            guard fileManager.fileExists(atPath: cachedPath) else {
-                // If not cached locally, read data stream
-                let dataPath = account.postbox.mediaBox.resourceData(resource.id, pathExtension: extensionName, waitUntilFetchStatus: true)
-                let _ = (dataPath |> take(1)).start(next: { data in
-                    if data.complete, let sourcePath = data.path {
-                        self.copyAndStoreItem(
-                            sourcePath: sourcePath,
-                            peerId: peerId.toInt64(),
-                            messageId: messageId.id,
-                            chatTitle: chatTitle,
-                            authorName: authorName,
-                            timestamp: Int32(Date().timeIntervalSince1970),
-                            detectedType: detectedType,
-                            fileName: originalFileName,
-                            extensionName: extensionName,
-                            mimeType: mimeType,
-                            duration: duration,
-                            dimensions: dimensions,
-                            isOneTime: isOneTime,
-                            completion: completion
-                        )
-                    } else {
-                        DispatchQueue.main.async { completion(false, "Media file downloading, retry in a moment") }
-                    }
-                })
+            if let cachedPath = cachedPath, fileManager.fileExists(atPath: cachedPath) {
+                self.copyAndStoreItem(
+                    sourcePath: cachedPath,
+                    peerId: peerId.toInt64(),
+                    messageId: messageId.id,
+                    chatTitle: chatTitle,
+                    authorName: authorName,
+                    timestamp: Int32(Date().timeIntervalSince1970),
+                    detectedType: detectedType,
+                    fileName: originalFileName,
+                    extensionName: extensionName,
+                    mimeType: mimeType,
+                    duration: duration,
+                    dimensions: dimensions,
+                    isOneTime: isOneTime,
+                    completion: completion
+                )
                 return
             }
             
-            self.copyAndStoreItem(
-                sourcePath: cachedPath,
-                peerId: peerId.toInt64(),
-                messageId: messageId.id,
-                chatTitle: chatTitle,
-                authorName: authorName,
-                timestamp: Int32(Date().timeIntervalSince1970),
-                detectedType: detectedType,
-                fileName: originalFileName,
-                extensionName: extensionName,
-                mimeType: mimeType,
-                duration: duration,
-                dimensions: dimensions,
-                isOneTime: isOneTime,
-                completion: completion
-            )
+            // If not cached locally, read data stream
+            let dataPath = account.postbox.mediaBox.resourceData(resource.id, pathExtension: extensionName, waitUntilFetchStatus: true)
+            let _ = (dataPath |> take(1)).start(next: { data in
+                if data.complete, let sourcePath = data.path {
+                    self.copyAndStoreItem(
+                        sourcePath: sourcePath,
+                        peerId: peerId.toInt64(),
+                        messageId: messageId.id,
+                        chatTitle: chatTitle,
+                        authorName: authorName,
+                        timestamp: Int32(Date().timeIntervalSince1970),
+                        detectedType: detectedType,
+                        fileName: originalFileName,
+                        extensionName: extensionName,
+                        mimeType: mimeType,
+                        duration: duration,
+                        dimensions: dimensions,
+                        isOneTime: isOneTime,
+                        completion: completion
+                    )
+                } else {
+                    DispatchQueue.main.async { completion(false, "Media file downloading, retry in a moment") }
+                }
+            })
         }
     }
     
