@@ -997,7 +997,7 @@ private func validateBatch(postbox: Postbox, network: Network, transaction: Tran
                                             LightGramSpyManager.shared.recordDeletedMessage(from: message, in: transaction)
                                             LightGramSpyManager.shared.markMessageAsDeleted(peerId: id.peerId.toInt64(), messageId: id.id, originalTimestamp: message.timestamp, chatTitle: transaction.getPeer(id.peerId)?.debugDisplayTitle ?? "Chat", authorName: message.author?.debugDisplayTitle ?? "Unknown", text: message.text)
                                             transaction.updateMessage(id, update: { currentMessage in
-                                                return .update(currentMessage)
+                                                return .update(StoreMessage(message: currentMessage))
                                             })
                                         }
                                     } else {
@@ -1190,7 +1190,7 @@ private func validateReplyThreadBatch(postbox: Postbox, network: Network, transa
                                     LightGramSpyManager.shared.recordDeletedMessage(from: message, in: transaction)
                                     LightGramSpyManager.shared.markMessageAsDeleted(peerId: id.peerId.toInt64(), messageId: id.id, originalTimestamp: message.timestamp, chatTitle: transaction.getPeer(id.peerId)?.debugDisplayTitle ?? "Chat", authorName: message.author?.debugDisplayTitle ?? "Unknown", text: message.text)
                                     transaction.updateMessage(id, update: { currentMessage in
-                                        return .update(currentMessage)
+                                        return .update(StoreMessage(message: currentMessage))
                                     })
                                 }
                             } else {

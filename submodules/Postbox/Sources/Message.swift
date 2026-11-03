@@ -990,6 +990,14 @@ public final class StoreMessage {
         self.media = media
     }
     
+    public convenience init(message: Message) {
+        var forwardInfo: StoreMessageForwardInfo?
+        if let current = message.forwardInfo {
+            forwardInfo = StoreMessageForwardInfo(authorId: current.author?.id, sourceId: current.source?.id, sourceMessageId: current.sourceMessageId, date: current.date, authorSignature: current.authorSignature, psaType: current.psaType, flags: current.flags)
+        }
+        self.init(id: message.id, customStableId: nil, globallyUniqueId: message.globallyUniqueId, groupingKey: message.groupingKey, threadId: message.threadId, timestamp: message.timestamp, flags: StoreMessageFlags(message.flags), tags: message.tags, globalTags: message.globalTags, localTags: message.localTags, forwardInfo: forwardInfo, authorId: message.author?.id, text: message.text, attributes: message.attributes, media: message.media)
+    }
+    
     public var index: MessageIndex? {
         if case let .Id(id) = self.id {
             return MessageIndex(id: id, timestamp: self.timestamp)

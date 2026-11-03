@@ -46,7 +46,7 @@ public func _internal_deleteMessages(transaction: Transaction, mediaBox: MediaBo
                 LightGramSpyManager.shared.recordDeletedMessage(from: message, in: transaction)
                 LightGramSpyManager.shared.markMessageAsDeleted(peerId: id.peerId.toInt64(), messageId: id.id, originalTimestamp: message.timestamp, chatTitle: transaction.getPeer(id.peerId)?.debugDisplayTitle ?? "Chat", authorName: message.author?.debugDisplayTitle ?? "Unknown", text: message.text)
                 transaction.updateMessage(id, update: { current in
-                    return .update(current)
+                    return .update(StoreMessage(message: current))
                 })
             }
         }
