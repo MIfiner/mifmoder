@@ -222,7 +222,7 @@ public final class LightGramMediaVaultManager {
             }
             
             // If not cached locally, read data stream
-            let dataPath = account.postbox.mediaBox.resourceData(resource.id, pathExtension: extensionName, waitUntilFetchStatus: true)
+            let dataPath = account.postbox.mediaBox.resourceData(id: resource.id, pathExtension: extensionName, option: .complete(waitUntilFetchStatus: true))
             let _ = (dataPath |> take(1)).start(next: { data in
                 if data.complete, let sourcePath = data.path {
                     self.copyAndStoreItem(
