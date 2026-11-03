@@ -23,20 +23,20 @@ public struct SmartFolderItem: Codable, Equatable {
 public final class LightGramSmartFoldersController: ViewController, UITableViewDataSource, UITableViewDelegate {
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private var folders: [SmartFolderItem] = [
-        SmartFolderItem(id: "all", name: "All Chats", icon: "💬", isEnabled: true),
-        SmartFolderItem(id: "unread", name: "Unread", icon: "📬", isEnabled: true),
-        SmartFolderItem(id: "personal", name: "Personal (DMs)", icon: "👤", isEnabled: true),
-        SmartFolderItem(id: "groups", name: "Groups", icon: "👥", isEnabled: true),
-        SmartFolderItem(id: "channels", name: "Channels", icon: "📢", isEnabled: true),
-        SmartFolderItem(id: "bots", name: "Bots", icon: "🤖", isEnabled: true),
-        SmartFolderItem(id: "work", name: "Work", icon: "💼", isEnabled: false),
-        SmartFolderItem(id: "important", name: "Important", icon: "⭐", isEnabled: false),
-        SmartFolderItem(id: "archived", name: "Archived", icon: "📦", isEnabled: true)
+        SmartFolderItem(id: "all", name: LightGramStrings.tr("SmartFolders_All"), icon: "💬", isEnabled: true),
+        SmartFolderItem(id: "unread", name: LightGramStrings.tr("SmartFolders_Unread"), icon: "📬", isEnabled: true),
+        SmartFolderItem(id: "personal", name: LightGramStrings.tr("SmartFolders_Personal"), icon: "👤", isEnabled: true),
+        SmartFolderItem(id: "groups", name: LightGramStrings.tr("SmartFolders_Groups"), icon: "👥", isEnabled: true),
+        SmartFolderItem(id: "channels", name: LightGramStrings.tr("SmartFolders_Channels"), icon: "📢", isEnabled: true),
+        SmartFolderItem(id: "bots", name: LightGramStrings.tr("SmartFolders_Bots"), icon: "🤖", isEnabled: true),
+        SmartFolderItem(id: "work", name: LightGramStrings.tr("SmartFolders_Work"), icon: "💼", isEnabled: false),
+        SmartFolderItem(id: "important", name: LightGramStrings.tr("SmartFolders_Important"), icon: "⭐", isEnabled: false),
+        SmartFolderItem(id: "archived", name: LightGramStrings.tr("SmartFolders_Archived"), icon: "📦", isEnabled: true)
     ]
     
     public init() {
         super.init(navigationBarPresentationData: makeLightGramNavBarData())
-        self.title = "Smart Folders"
+        self.title = LightGramStrings.tr("SmartFolders_Title")
     }
     
     required public init(coder aDecoder: NSCoder) {

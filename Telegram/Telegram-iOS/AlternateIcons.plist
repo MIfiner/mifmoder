@@ -106,4 +106,40 @@
         <key>UIPrerenderedIcon</key>
         <true/>
     </dict>
+    <key>AmberIcon</key>
+    <dict>
+        <key>CFBundleIconFiles</key>
+        <array>
+            <string>AmberIcon</string>
+        </array>
+        <key>UIPrerenderedIcon</key>
+        <true/>
+    </dict>
+    <key>IceIcon</key>
+    <dict>
+        <key>CFBundleIconFiles</key>
+        <array>
+            <string>IceIcon</string>
+        </array>
+        <key>UIPrerenderedIcon</key>
+        <true/>
+    </dict>
+    <key>VioletIcon</key>
+    <dict>
+        <key>CFBundleIconFiles</key>
+        <array>
+            <string>VioletIcon</string>
+        </array>
+        <key>UIPrerenderedIcon</key>
+        <true/>
+    </dict>
+    <key>EmeraldIcon</key>
+    <dict>
+        <key>CFBundleIconFiles</key>
+        <array>
+            <string>EmeraldIcon</string>
+        </array>
+        <key>UIPrerenderedIcon</key>
+        <true/>
+    </dict>
 </dict>

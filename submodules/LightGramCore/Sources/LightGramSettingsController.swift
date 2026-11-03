@@ -3,13 +3,16 @@ import UIKit
 import Display
 import AsyncDisplayKit
 import TelegramCore
+import AccountContext
 
 public final class LightGramSettingsController: ViewController, UITableViewDataSource, UITableViewDelegate {
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
+    private let context: AccountContext?
     
-    public init() {
+    public init(context: AccountContext? = nil) {
+        self.context = context
         super.init(navigationBarPresentationData: makeLightGramNavBarData())
-        self.title = "LightGram V1"
+        self.title = LightGramStrings.tr("Settings")
     }
     
     required public init(coder aDecoder: NSCoder) {
@@ -58,8 +61,7 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         iconImageView.layer.masksToBounds = true
         iconImageView.contentMode = .scaleAspectFill
         
-        // Load app icon
-        if let icon = UIImage(named: "Simple-iTunesArtwork") ?? UIImage(named: "AppIcon") {
+        if let icon = UIImage(named: "Simple-iTunesArtwork") ?? UIImage(named: "AppIcon") ?? UIImage(contentsOfFile: "/opt/lightgram/submodules/LightGramCore/Resources/Logos/01_LightGram_Amber.png") {
             iconImageView.image = icon
         } else {
             iconImageView.backgroundColor = UIColor(rgb: 0x1A1A1C)
@@ -68,7 +70,7 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         header.addSubview(iconImageView)
         
         let titleLabel = UILabel()
-        titleLabel.text = "LightGram V1"
+        titleLabel.text = LightGramStrings.tr("LightGram")
         titleLabel.font = UIFont.systemFont(ofSize: 22, weight: .bold)
         titleLabel.textColor = LightGramSettings.signatureYellowAccent
         titleLabel.textAlignment = .center
@@ -117,11 +119,11 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
     public func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         guard let s = Section(rawValue: section) else { return nil }
         switch s {
-        case .ghostMode: return "👻 Ghost Mode"
-        case .spyMode: return "🕵️ Spy Mode & Anti-Recall"
-        case .privacyAndSecurity: return "🔒 Privacy & Security"
-        case .smartFilters: return "📁 Smart Filters & Navigation"
-        case .tools: return "🛠️ Tools & Utilities"
+        case .ghostMode: return LightGramStrings.tr("GhostMode_Header")
+        case .spyMode: return LightGramStrings.tr("SpyMode_Header")
+        case .privacyAndSecurity: return LightGramStrings.tr("PrivacyCenter_Header")
+        case .smartFilters: return LightGramStrings.tr("SmartFolders_Header")
+        case .tools: return LightGramStrings.tr("Settings")
         }
     }
     
@@ -129,11 +131,9 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         guard let s = Section(rawValue: section) else { return nil }
         switch s {
         case .ghostMode:
-            return "Note: Telegram server automatically advances read status if you send an outgoing message in that chat."
+            return LightGramStrings.tr("GhostMode_Master_Desc")
         case .spyMode:
-            return "Saved messages are stored in an encrypted local archive on this device."
-        case .privacyAndSecurity:
-            return "When Forward without author is enabled, quoted metadata is removed during message sharing."
+            return LightGramStrings.tr("SpyMode_Master_Desc")
         default:
             return nil
         }
@@ -146,7 +146,7 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         case .spyMode: return 5
         case .privacyAndSecurity: return 2
         case .smartFilters: return 1
-        case .tools: return 7
+        case .tools: return 8
         }
     }
     
@@ -161,35 +161,35 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         case .ghostMode:
             switch indexPath.row {
             case 0:
-                cell.textLabel?.text = "Enable Ghost Mode"
+                cell.textLabel?.text = LightGramStrings.tr("GhostMode_Master")
                 let sw = self.makeSwitch(isOn: LightGramSettings.shared.isGhostModeEnabled) { [weak self] on in
                     LightGramSettings.shared.isGhostModeEnabled = on
                     self?.tableView.reloadData()
                 }
                 cell.accessoryView = sw
             case 1:
-                cell.textLabel?.text = "Don't Send Read Receipts"
+                cell.textLabel?.text = LightGramStrings.tr("GhostMode_NoReadReceipts")
                 let sw = self.makeSwitch(isOn: LightGramSettings.shared.suppressReadHistory) { on in
                     LightGramSettings.shared.suppressReadHistory = on
                 }
                 sw.isEnabled = LightGramSettings.shared.isGhostModeEnabled
                 cell.accessoryView = sw
             case 2:
-                cell.textLabel?.text = "Hide Typing Status"
+                cell.textLabel?.text = LightGramStrings.tr("GhostMode_HideTyping")
                 let sw = self.makeSwitch(isOn: LightGramSettings.shared.suppressTyping) { on in
                     LightGramSettings.shared.suppressTyping = on
                 }
                 sw.isEnabled = LightGramSettings.shared.isGhostModeEnabled
                 cell.accessoryView = sw
             case 3:
-                cell.textLabel?.text = "Stealth Story Views"
+                cell.textLabel?.text = LightGramStrings.tr("GhostMode_StealthStory")
                 let sw = self.makeSwitch(isOn: LightGramSettings.shared.suppressStoryViews) { on in
                     LightGramSettings.shared.suppressStoryViews = on
                 }
                 sw.isEnabled = LightGramSettings.shared.isGhostModeEnabled
                 cell.accessoryView = sw
             case 4:
-                cell.textLabel?.text = "Mark As Read On Reply"
+                cell.textLabel?.text = LightGramStrings.tr("GhostMode_MarkOnReply")
                 let sw = self.makeSwitch(isOn: LightGramSettings.shared.markAsReadOnReply) { on in
                     LightGramSettings.shared.markAsReadOnReply = on
                 }
@@ -200,40 +200,39 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         case .spyMode:
             switch indexPath.row {
             case 0:
-                cell.textLabel?.text = "Enable Spy Mode"
+                cell.textLabel?.text = LightGramStrings.tr("SpyMode_Master")
                 let sw = self.makeSwitch(isOn: LightGramSettings.shared.isSpyModeEnabled) { [weak self] on in
                     LightGramSettings.shared.isSpyModeEnabled = on
                     self?.tableView.reloadData()
                 }
                 cell.accessoryView = sw
             case 1:
-                cell.textLabel?.text = "Save Deleted Messages"
+                cell.textLabel?.text = LightGramStrings.tr("SpyMode_SaveDeleted")
                 let sw = self.makeSwitch(isOn: LightGramSettings.shared.saveDeletedMessages) { on in
                     LightGramSettings.shared.saveDeletedMessages = on
                 }
                 sw.isEnabled = LightGramSettings.shared.isSpyModeEnabled
                 cell.accessoryView = sw
             case 2:
-                cell.textLabel?.text = "Save Edit History"
+                cell.textLabel?.text = LightGramStrings.tr("SpyMode_SaveEdits")
                 let sw = self.makeSwitch(isOn: LightGramSettings.shared.saveEditHistory) { on in
                     LightGramSettings.shared.saveEditHistory = on
                 }
                 sw.isEnabled = LightGramSettings.shared.isSpyModeEnabled
                 cell.accessoryView = sw
             case 3:
-                cell.textLabel?.text = "Browse Spy Archive"
+                cell.textLabel?.text = LightGramStrings.tr("SpyMode_OpenArchive")
                 cell.accessoryType = .disclosureIndicator
             case 4:
-                cell.textLabel?.text = "Archive Storage Size"
-                cell.detailTextLabel?.text = LightGramSpyManager.shared.formattedArchiveSize()
-                cell.accessoryType = .none
+                cell.textLabel?.text = LightGramStrings.tr("PrivacyCenter_TTL")
+                cell.detailTextLabel?.text = "\(LightGramSettings.shared.retentionDaysTTL) days"
             default: break
             }
             
         case .privacyAndSecurity:
             switch indexPath.row {
             case 0:
-                cell.textLabel?.text = "Face ID / Passcode For Archive"
+                cell.textLabel?.text = LightGramStrings.tr("PrivacyCenter_Biometrics")
                 let sw = self.makeSwitch(isOn: LightGramSettings.shared.biometricLockArchive) { on in
                     LightGramSettings.shared.biometricLockArchive = on
                 }
@@ -248,7 +247,7 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
             }
             
         case .smartFilters:
-            cell.textLabel?.text = "Quick Chat Filters (Users, Groups, Bots)"
+            cell.textLabel?.text = LightGramStrings.tr("SmartFolders_Header")
             let sw = self.makeSwitch(isOn: LightGramSettings.shared.smartFiltersEnabled) { on in
                 LightGramSettings.shared.smartFiltersEnabled = on
             }
@@ -257,24 +256,28 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         case .tools:
             switch indexPath.row {
             case 0:
-                cell.textLabel?.text = "Control Center (AMOLED Dashboard)"
+                cell.textLabel?.text = "Control Center (Dashboard)"
                 cell.accessoryType = .disclosureIndicator
             case 1:
-                cell.textLabel?.text = "Smart Folders"
+                cell.textLabel?.text = LightGramStrings.tr("Logos_Title")
+                cell.detailTextLabel?.text = LightGramSettings.shared.activeLogoTheme.replacingOccurrences(of: "Icon", with: "")
                 cell.accessoryType = .disclosureIndicator
             case 2:
-                cell.textLabel?.text = "Message Notes & Reminders"
+                cell.textLabel?.text = LightGramStrings.tr("SmartFolders_Title")
                 cell.accessoryType = .disclosureIndicator
             case 3:
-                cell.textLabel?.text = "Media & Storage Center"
+                cell.textLabel?.text = LightGramStrings.tr("Notes_Title")
                 cell.accessoryType = .disclosureIndicator
             case 4:
-                cell.textLabel?.text = "Privacy & Security Center"
+                cell.textLabel?.text = LightGramStrings.tr("MediaCenter_Title")
                 cell.accessoryType = .disclosureIndicator
             case 5:
-                cell.textLabel?.text = "Group & Bot Tools"
+                cell.textLabel?.text = LightGramStrings.tr("PrivacyCenter_Title")
                 cell.accessoryType = .disclosureIndicator
             case 6:
+                cell.textLabel?.text = LightGramStrings.tr("BotManager_Title")
+                cell.accessoryType = .disclosureIndicator
+            case 7:
                 cell.textLabel?.text = "Network Diagnostics"
                 cell.detailTextLabel?.text = "NWConnection / DC 2"
                 cell.accessoryType = .disclosureIndicator
@@ -307,50 +310,25 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         } else if s == .tools {
             switch indexPath.row {
             case 0:
-                self.push(LightGramControlCenterController())
+                self.push(LightGramControlCenterController(context: self.context))
             case 1:
-                self.push(LightGramSmartFoldersController())
+                if let context = self.context {
+                    self.push(LightGramLogosController(context: context))
+                }
             case 2:
-                self.push(LightGramNotesController())
+                self.push(LightGramSmartFoldersController())
             case 3:
-                self.push(LightGramMediaCenterController())
+                self.push(LightGramNotesController())
             case 4:
-                self.push(LightGramPrivacyCenterController())
+                self.push(LightGramMediaCenterController())
             case 5:
-                self.push(LightGramBotManagerController())
+                self.push(LightGramPrivacyCenterController())
             case 6:
+                self.push(LightGramBotManagerController())
+            case 7:
                 self.push(LightGramNetworkDiagnosticsController())
             default: break
             }
         }
-    }
-    
-    private func showNetworkDiagnostics() {
-        let appVersion = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0"
-        let logLines = Logger.shared.getRecentLogLines()
-        let report = """
-        === LightGram V1 Network Diagnostics ===
-        App Version: \(appVersion)
-        iOS: \(UIDevice.current.systemVersion)
-        Active Transport: Network.framework (NWConnection)
-        DC 2: 149.154.167.50:443
-        DC 1: 149.154.175.50:443
-        DC 4: 149.154.167.91:443
-        
-        Recent Logs (\(logLines.count) lines):
-        \(logLines.suffix(60).joined(separator: "\n"))
-        """
-        
-        let alert = UIAlertController(title: "Network Diagnostics", message: "Live MTProto & Transport status:", preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Copy Full Report", style: .default, handler: { _ in
-            UIPasteboard.general.string = report
-        }))
-        alert.addAction(UIAlertAction(title: "Share", style: .default, handler: { [weak self] _ in
-            guard let self = self else { return }
-            let activity = UIActivityViewController(activityItems: [report], applicationActivities: nil)
-            self.present(activity, animated: true, completion: nil)
-        }))
-        alert.addAction(UIAlertAction(title: "Close", style: .cancel, handler: nil))
-        self.present(alert, animated: true, completion: nil)
     }
 }

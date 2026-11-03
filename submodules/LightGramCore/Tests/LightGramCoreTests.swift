@@ -286,4 +286,27 @@ final class LightGramCoreTests: XCTestCase {
         
         waitForExpectations(timeout: 2.0)
     }
+    
+    func testLogosAndLocalization() {
+        // Test Logos count and attributes
+        XCTAssertEqual(LightGramLogosController.availableLogos.count, 4)
+        let ids = LightGramLogosController.availableLogos.map { $0.id }
+        XCTAssertTrue(ids.contains("AmberIcon"))
+        XCTAssertTrue(ids.contains("IceIcon"))
+        XCTAssertTrue(ids.contains("VioletIcon"))
+        XCTAssertTrue(ids.contains("EmeraldIcon"))
+        
+        // Test active logo theme setting
+        LightGramSettings.shared.activeLogoTheme = "EmeraldIcon"
+        XCTAssertEqual(LightGramSettings.shared.activeLogoTheme, "EmeraldIcon")
+        LightGramSettings.shared.activeLogoTheme = "AmberIcon"
+        XCTAssertEqual(LightGramSettings.shared.activeLogoTheme, "AmberIcon")
+        
+        // Test Localization
+        XCTAssertFalse(LightGramStrings.tr("GhostMode").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("SpyMode").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("Logos_Title").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("Badge_Deleted").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("Badge_Edited").isEmpty)
+    }
 }

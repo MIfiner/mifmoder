@@ -183,6 +183,10 @@ func localReadMarkIsAheadOfServer(localMaxIncomingReadId: MessageId.Id, serverMa
 }
 
 private func validatePeerReadState(network: Network, postbox: Postbox, stateManager: AccountStateManager, peerId: PeerId) -> Signal<Never, PeerReadStateValidationError> {
+    if LightGramGhostController.shared.shouldSuppressReadHistory(peerId: peerId.toInt64()) {
+        return confirmSynchronized(postbox: postbox, peerId: peerId)
+        |> ignoreValues
+    }
     if peerId.namespace == Namespaces.Peer.SecretChat {
         // A secret chat has no Api.InputPeer, so there is no dialog to read an authoritative
         // read state from: every step below fails at inputPeer and asks to retry, forever.
@@ -212,6 +216,9 @@ private func validatePeerReadState(network: Network, postbox: Postbox, stateMana
                         case let .idBased(localMaxIncomingReadId, _, _, _, _):
                             if case let .idBased(updatedMaxIncomingReadId, _, _, updatedCount, updatedMarkedUnread) = readState {
                                 if localReadMarkIsAheadOfServer(localMaxIncomingReadId: localMaxIncomingReadId, serverMaxIncomingReadId: updatedMaxIncomingReadId, serverCount: updatedCount, serverMarkedUnread: updatedMarkedUnread) {
+                                    if LightGramGhostController.shared.shouldSuppressReadHistory(peerId: peerId.toInt64()) {
+                                        return nil
+                                    }
                                     return .retry
                                 }
                             }
@@ -428,6 +435,10 @@ private func pushPeerReadState(network: Network, postbox: Postbox, stateManager:
 }
 
 func synchronizePeerReadState(network: Network, postbox: Postbox, stateManager: AccountStateManager, peerId: PeerId, push: Bool, validate: Bool) -> Signal<Never, PeerReadStateValidationError> {
+    if LightGramGhostController.shared.shouldSuppressReadHistory(peerId: peerId.toInt64()) {
+        return confirmSynchronized(postbox: postbox, peerId: peerId)
+        |> ignoreValues
+    }
     // A channel the account is not a member of has no read state on the server
     // (NonMemberChannelReadState.swift): nothing is pushed or validated, and the queued operation
     // is confirmed so the manager does not pick it up again. This also covers paths that queue one

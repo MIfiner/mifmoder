@@ -16,7 +16,7 @@ public final class LightGramNotesController: ViewController, UITableViewDataSour
     
     public init() {
         super.init(navigationBarPresentationData: makeLightGramNavBarData())
-        self.title = "Message Notes & Reminders"
+        self.title = LightGramStrings.tr("Notes_Title")
     }
     
     required public init(coder aDecoder: NSCoder) {

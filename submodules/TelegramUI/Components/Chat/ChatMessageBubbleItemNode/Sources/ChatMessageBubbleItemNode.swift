@@ -5749,7 +5749,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             borderNode.layer.borderColor = UIColor(rgb: 0xFF3B30).cgColor
             borderNode.layer.borderWidth = 2.0
             borderNode.layer.cornerRadius = 16.0
-            borderNode.backgroundColor = UIColor(rgb: 0xFF3B30).withAlphaComponent(0.08)
+            borderNode.backgroundColor = nil
             if borderNode.supernode == nil {
                 strongSelf.mainContextSourceNode.contentNode.addSubnode(borderNode)
             }
@@ -5758,8 +5758,10 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             let badgeBg = strongSelf.lightGramSpyBadgeBackgroundNode ?? ASDisplayNode()
             strongSelf.lightGramSpyBadgeBackgroundNode = badgeBg
             badgeBg.isUserInteractionEnabled = false
-            badgeBg.backgroundColor = UIColor(rgb: 0xFF3B30).withAlphaComponent(0.92)
-            badgeBg.cornerRadius = 9.0
+            badgeBg.backgroundColor = UIColor(rgb: 0x1C1C1E)
+            badgeBg.layer.borderColor = UIColor(rgb: 0xFF3B30).cgColor
+            badgeBg.layer.borderWidth = 1.0
+            badgeBg.cornerRadius = 8.0
             if badgeBg.supernode == nil {
                 strongSelf.mainContextSourceNode.contentNode.addSubnode(badgeBg)
             }
@@ -5768,11 +5770,11 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             strongSelf.lightGramSpyBadgeNode = badgeNode
             badgeNode.isUserInteractionEnabled = false
             let (badgeLayout, badgeApply) = TextNode.asyncLayout(badgeNode)(TextNodeLayoutArguments(
-                attributedString: NSAttributedString(string: "🔴 DELETED MESSAGE", font: Font.bold(10.0), textColor: .white),
+                attributedString: NSAttributedString(string: "🔴 DELETED", font: Font.bold(9.5), textColor: .white),
                 backgroundColor: nil,
                 maximumNumberOfLines: 1,
                 truncationType: .end,
-                constrainedSize: CGSize(width: max(20.0, backgroundFrame.width - 24.0), height: 18.0),
+                constrainedSize: CGSize(width: max(20.0, backgroundFrame.width - 24.0), height: 16.0),
                 alignment: .natural,
                 cutout: nil,
                 insets: UIEdgeInsets()
@@ -5781,18 +5783,17 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             if appliedNode.supernode == nil {
                 strongSelf.mainContextSourceNode.contentNode.addSubnode(appliedNode)
             }
-            let badgePaddingH: CGFloat = 8.0
-            let badgeHeight: CGFloat = 18.0
+            let badgePaddingH: CGFloat = 6.0
+            let badgeHeight: CGFloat = 16.0
             let badgeWidth = badgeLayout.size.width + badgePaddingH * 2.0
-            let badgeX = backgroundFrame.minX + 10.0
-            let badgeY = max(0.0, backgroundFrame.minY + 4.0)
+            let isIncoming = item.message.effectivelyIncoming(item.context.account.peerId)
+            let badgeX = isIncoming ? (backgroundFrame.minX + 14.0) : (backgroundFrame.maxX - badgeWidth - 14.0)
+            let badgeY = max(0.0, backgroundFrame.minY - badgeHeight * 0.5)
             badgeBg.frame = CGRect(x: badgeX, y: badgeY, width: badgeWidth, height: badgeHeight)
             appliedNode.frame = CGRect(x: badgeX + badgePaddingH, y: badgeY + (badgeHeight - badgeLayout.size.height) * 0.5, width: badgeLayout.size.width, height: badgeLayout.size.height)
         } else if !spyEditRecords.isEmpty {
             let lastEdit = spyEditRecords.first!
-            let editSnippet = lastEdit.previousText.trimmingCharacters(in: .whitespacesAndNewlines)
-            let snippet = editSnippet.count > 25 ? String(editSnippet.prefix(25)) + "…" : editSnippet
-            let badgeText = "🟡 EDITED [Rev \(lastEdit.revision)]: \"\(snippet)\""
+            let badgeText = "🟡 EDITED / REV \(lastEdit.revision)"
             
             let borderNode = strongSelf.lightGramSpyBorderNode ?? ASDisplayNode()
             strongSelf.lightGramSpyBorderNode = borderNode
@@ -5800,7 +5801,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             borderNode.layer.borderColor = UIColor(rgb: 0xEDB400).cgColor
             borderNode.layer.borderWidth = 1.5
             borderNode.layer.cornerRadius = 16.0
-            borderNode.backgroundColor = UIColor(rgb: 0xEDB400).withAlphaComponent(0.06)
+            borderNode.backgroundColor = nil
             if borderNode.supernode == nil {
                 strongSelf.mainContextSourceNode.contentNode.addSubnode(borderNode)
             }
@@ -5809,8 +5810,10 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             let badgeBg = strongSelf.lightGramSpyBadgeBackgroundNode ?? ASDisplayNode()
             strongSelf.lightGramSpyBadgeBackgroundNode = badgeBg
             badgeBg.isUserInteractionEnabled = false
-            badgeBg.backgroundColor = UIColor(rgb: 0xEDB400).withAlphaComponent(0.92)
-            badgeBg.cornerRadius = 9.0
+            badgeBg.backgroundColor = UIColor(rgb: 0x1C1C1E)
+            badgeBg.layer.borderColor = UIColor(rgb: 0xEDB400).cgColor
+            badgeBg.layer.borderWidth = 1.0
+            badgeBg.cornerRadius = 8.0
             if badgeBg.supernode == nil {
                 strongSelf.mainContextSourceNode.contentNode.addSubnode(badgeBg)
             }
@@ -5819,11 +5822,11 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             strongSelf.lightGramSpyBadgeNode = badgeNode
             badgeNode.isUserInteractionEnabled = false
             let (badgeLayout, badgeApply) = TextNode.asyncLayout(badgeNode)(TextNodeLayoutArguments(
-                attributedString: NSAttributedString(string: badgeText, font: Font.semibold(10.0), textColor: .black),
+                attributedString: NSAttributedString(string: badgeText, font: Font.bold(9.5), textColor: UIColor(rgb: 0xFFD60A)),
                 backgroundColor: nil,
                 maximumNumberOfLines: 1,
                 truncationType: .end,
-                constrainedSize: CGSize(width: max(20.0, backgroundFrame.width - 24.0), height: 18.0),
+                constrainedSize: CGSize(width: max(20.0, backgroundFrame.width - 24.0), height: 16.0),
                 alignment: .natural,
                 cutout: nil,
                 insets: UIEdgeInsets()
@@ -5832,11 +5835,12 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             if appliedNode.supernode == nil {
                 strongSelf.mainContextSourceNode.contentNode.addSubnode(appliedNode)
             }
-            let badgePaddingH: CGFloat = 8.0
-            let badgeHeight: CGFloat = 18.0
+            let badgePaddingH: CGFloat = 6.0
+            let badgeHeight: CGFloat = 16.0
             let badgeWidth = badgeLayout.size.width + badgePaddingH * 2.0
-            let badgeX = backgroundFrame.minX + 10.0
-            let badgeY = max(0.0, backgroundFrame.minY + 4.0)
+            let isIncoming = item.message.effectivelyIncoming(item.context.account.peerId)
+            let badgeX = isIncoming ? (backgroundFrame.minX + 14.0) : (backgroundFrame.maxX - badgeWidth - 14.0)
+            let badgeY = max(0.0, backgroundFrame.minY - badgeHeight * 0.5)
             badgeBg.frame = CGRect(x: badgeX, y: badgeY, width: badgeWidth, height: badgeHeight)
             appliedNode.frame = CGRect(x: badgeX + badgePaddingH, y: badgeY + (badgeHeight - badgeLayout.size.height) * 0.5, width: badgeLayout.size.width, height: badgeLayout.size.height)
         } else {

@@ -7,7 +7,7 @@ import TelegramCore
 
 public final class LightGramSpyArchiveController: ViewController, UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate {
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
-    private let segmentedControl = UISegmentedControl(items: ["Deleted Messages", "Edit History"])
+    private let segmentedControl = UISegmentedControl(items: [LightGramStrings.tr("SpyArchive_DeletedTab"), LightGramStrings.tr("SpyArchive_EditsTab")])
     private let searchBar = UISearchBar()
     
     private var deletedMessages: [SpyDeletedMessageRecord] = []
@@ -20,7 +20,7 @@ public final class LightGramSpyArchiveController: ViewController, UITableViewDat
     
     public init() {
         super.init(navigationBarPresentationData: makeLightGramNavBarData())
-        self.title = "Spy Archive"
+        self.title = LightGramStrings.tr("SpyArchive_Title")
     }
     
     required public init(coder aDecoder: NSCoder) {
@@ -50,7 +50,7 @@ public final class LightGramSpyArchiveController: ViewController, UITableViewDat
         filterItem.tintColor = LightGramSettings.signatureYellowAccent
         
         let clearItem = UIBarButtonItem(
-            title: "Clear",
+            title: LightGramStrings.tr("Clear"),
             style: .plain,
             target: self,
             action: #selector(self.clearArchiveTapped)

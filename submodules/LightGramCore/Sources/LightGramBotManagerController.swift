@@ -17,7 +17,7 @@ public final class LightGramBotManagerController: ViewController, UITableViewDat
     
     public init() {
         super.init(navigationBarPresentationData: makeLightGramNavBarData())
-        self.title = "Bot & Group Tools"
+        self.title = LightGramStrings.tr("BotManager_Title")
     }
     
     required public init(coder aDecoder: NSCoder) {

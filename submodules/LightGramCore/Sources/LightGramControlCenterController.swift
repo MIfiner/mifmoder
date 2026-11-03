@@ -3,31 +3,37 @@ import UIKit
 import Display
 import AsyncDisplayKit
 import TelegramCore
+import AccountContext
 
 public final class LightGramControlCenterController: ViewController, UITableViewDataSource, UITableViewDelegate {
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
+    private let context: AccountContext?
     
-    private let sections: [(title: String, items: [(title: String, subtitle: String, icon: String, destination: String)])] = [
-        ("Core Stealth & Privacy", [
-            ("Ghost Mode 2.0", "Manage read receipts, typing & online stealth", "👻", "ghost"),
-            ("Spy Mode & Anti-Recall", "Inline deleted & edited message preservation", "🕵️‍♂️", "spy"),
-            ("Privacy & Security Hub", "Biometric lock, notification privacy & data export", "🛡", "privacy")
-        ]),
-        ("Advanced Productivity Tools", [
-            ("Smart Folders", "Custom chat categorization & auto-sorting", "📁", "folders"),
-            ("Notes & Reminders", "Personal message notes & scheduled reminders", "📝", "notes"),
-            ("Media Center", "Categorized media library & storage cleaner", "🎬", "media"),
-            ("Bot & Group Manager", "Admin tools & bot shortcuts palette", "🤖", "bots")
-        ]),
-        ("System & Diagnostics", [
-            ("Network & MTProto Diagnostics", "Live DC ping RTT & connection status", "📶", "diagnostics"),
-            ("LightGram Settings", "Comprehensive application configuration", "⚙️", "settings")
-        ])
-    ]
+    private var sections: [(title: String, items: [(title: String, subtitle: String, icon: String, destination: String)])] {
+        return [
+            (LightGramStrings.tr("GhostMode_Header"), [
+                (LightGramStrings.tr("GhostMode"), LightGramStrings.tr("GhostMode_Master_Desc"), "👻", "ghost"),
+                (LightGramStrings.tr("SpyMode"), LightGramStrings.tr("SpyMode_Master_Desc"), "🕵️‍♂️", "spy"),
+                (LightGramStrings.tr("PrivacyCenter_Title"), LightGramStrings.tr("PrivacyCenter_Header"), "🛡", "privacy")
+            ]),
+            (LightGramStrings.tr("SmartFolders_Header"), [
+                (LightGramStrings.tr("SmartFolders_Title"), LightGramStrings.tr("SmartFolders_Header"), "📁", "folders"),
+                (LightGramStrings.tr("Notes_Title"), LightGramStrings.tr("Notes_Empty"), "📝", "notes"),
+                (LightGramStrings.tr("MediaCenter_Title"), LightGramStrings.tr("MediaCenter_Storage"), "🎬", "media"),
+                (LightGramStrings.tr("BotManager_Title"), LightGramStrings.tr("BotManager_Header"), "🤖", "bots")
+            ]),
+            (LightGramStrings.tr("Settings"), [
+                (LightGramStrings.tr("Logos_Title"), LightGramStrings.tr("Logos_Footer"), "🎨", "logos"),
+                ("Network Diagnostics", "Live DC ping RTT & NWConnection status", "📶", "diagnostics"),
+                (LightGramStrings.tr("Settings"), "LightGram Settings", "⚙️", "settings")
+            ])
+        ]
+    }
     
-    public init() {
+    public init(context: AccountContext? = nil) {
+        self.context = context
         super.init(navigationBarPresentationData: makeLightGramNavBarData())
-        self.title = "LightGram Control Center"
+        self.title = LightGramStrings.tr("LightGram")
     }
     
     required public init(coder aDecoder: NSCoder) {
@@ -96,7 +102,7 @@ public final class LightGramControlCenterController: ViewController, UITableView
         let targetController: ViewController
         switch dest {
         case "ghost":
-            targetController = LightGramSettingsController()
+            targetController = LightGramSettingsController(context: self.context)
         case "spy":
             targetController = LightGramSpyArchiveController()
         case "privacy":
@@ -109,10 +115,16 @@ public final class LightGramControlCenterController: ViewController, UITableView
             targetController = LightGramMediaCenterController()
         case "bots":
             targetController = LightGramBotManagerController()
+        case "logos":
+            if let context = self.context {
+                targetController = LightGramLogosController(context: context)
+            } else {
+                targetController = LightGramSettingsController(context: self.context)
+            }
         case "diagnostics":
             targetController = LightGramNetworkDiagnosticsController()
         default:
-            targetController = LightGramSettingsController()
+            targetController = LightGramSettingsController(context: self.context)
         }
         
         self.push(targetController)

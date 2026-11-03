@@ -409,6 +409,18 @@ class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
                                     name = item.strings.Appearance_AppIconBlack
                                 case "PremiumTurbo":
                                     name = item.strings.Appearance_AppIconTurbo
+                                case "AmberIcon":
+                                    name = "Amber"
+                                    bordered = false
+                                case "IceIcon":
+                                    name = "Ice"
+                                    bordered = false
+                                case "VioletIcon":
+                                    name = "Violet"
+                                    bordered = false
+                                case "EmeraldIcon":
+                                    name = "Emerald"
+                                    bordered = false
                                 default:
                                     name = icon.name
                             }

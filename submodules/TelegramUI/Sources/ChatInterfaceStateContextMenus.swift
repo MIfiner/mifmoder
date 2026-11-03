@@ -29,6 +29,7 @@ import DebugSettingsUI
 import ChatPresentationInterfaceState
 import Pasteboard
 import LightGramCore
+import LightGramCore
 import BrowserUI
 import ChatRichTextEditorComposer
 import SettingsUI
@@ -1473,17 +1474,17 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                     let isSpyDeleted = LightGramSpyManager.shared.isMessageDeleted(peerId: spyPeerId, messageId: message.id.id)
                     let spyEdits = LightGramSpyManager.shared.getEditRecords(peerId: spyPeerId, messageId: message.id.id)
                     if isSpyDeleted || !spyEdits.isEmpty {
-                        let spyTitle = isSpyDeleted ? "Deleted Message Details" : "Edit Revisions (\(spyEdits.count))"
+                        let spyTitle = isSpyDeleted ? LightGramStrings.tr("Menu_DeletedDetails") : "\(LightGramStrings.tr("Menu_EditHistory")) (\(spyEdits.count))"
                         actions.append(.action(ContextMenuActionItem(text: spyTitle, textColor: isSpyDeleted ? .destructive : .primary, icon: { theme in
                             return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Info"), color: isSpyDeleted ? UIColor(rgb: 0xFF3B30) : UIColor(rgb: 0xEDB400))
                         }, action: { _, f in
                             var infoText = ""
                             if isSpyDeleted, let record = LightGramSpyManager.shared.getDeletedRecord(peerId: spyPeerId, messageId: message.id.id) {
                                 let delDate = DateFormatter.localizedString(from: Date(timeIntervalSince1970: TimeInterval(record.deletionTimestamp)), dateStyle: .short, timeStyle: .short)
-                                infoText += "🗑 Message was deleted by \(record.authorName) at \(delDate).\nOriginal Text:\n\"\(record.text)\"\n\n"
+                                infoText += "🗑 [\(delDate)] \(record.authorName):\n\"\(record.text)\"\n\n"
                             }
                             if !spyEdits.isEmpty {
-                                infoText += "✏️ Edit Revisions History:\n"
+                                infoText += "✏️ \(LightGramStrings.tr("Menu_EditHistory")):\n"
                                 for rev in spyEdits {
                                     let editDate = DateFormatter.localizedString(from: Date(timeIntervalSince1970: TimeInterval(rev.timestamp)), dateStyle: .short, timeStyle: .short)
                                     infoText += "Rev \(rev.revision) (\(editDate)):\nWas: \"\(rev.previousText)\"\nNow: \"\(rev.newText)\"\n\n"
@@ -1491,13 +1492,13 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                             }
                             let alert = textAlertController(
                                 context: context,
-                                title: "Spy Mode Details",
+                                title: isSpyDeleted ? LightGramStrings.tr("Menu_DeletedDetails") : LightGramStrings.tr("Menu_EditHistory"),
                                 text: infoText,
                                 actions: [
-                                    TextAlertAction(type: .defaultAction, title: "Copy Original", action: {
+                                    TextAlertAction(type: .defaultAction, title: LightGramStrings.tr("Menu_CopyOriginal"), action: {
                                         UIPasteboard.general.string = isSpyDeleted ? (LightGramSpyManager.shared.getDeletedRecord(peerId: spyPeerId, messageId: message.id.id)?.text ?? "") : (spyEdits.first?.previousText ?? "")
                                     }),
-                                    TextAlertAction(type: .genericAction, title: "OK", action: {})
+                                    TextAlertAction(type: .genericAction, title: LightGramStrings.tr("OK"), action: {})
                                 ]
                             )
                             controllerInteraction.presentController(alert, nil)
@@ -2482,17 +2483,17 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                     let isSpyDeleted = LightGramSpyManager.shared.isMessageDeleted(peerId: spyPeerId, messageId: message.id.id)
                     let spyEdits = LightGramSpyManager.shared.getEditRecords(peerId: spyPeerId, messageId: message.id.id)
                     if isSpyDeleted || !spyEdits.isEmpty {
-                        let spyTitle = isSpyDeleted ? "Deleted Message Details" : "Edit Revisions (\(spyEdits.count))"
+                        let spyTitle = isSpyDeleted ? LightGramStrings.tr("Menu_DeletedDetails") : "\(LightGramStrings.tr("Menu_EditHistory")) (\(spyEdits.count))"
                         actions.append(.action(ContextMenuActionItem(text: spyTitle, textColor: isSpyDeleted ? .destructive : .primary, icon: { theme in
                             return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Info"), color: isSpyDeleted ? UIColor(rgb: 0xFF3B30) : UIColor(rgb: 0xEDB400))
                         }, action: { _, f in
                             var infoText = ""
                             if isSpyDeleted, let record = LightGramSpyManager.shared.getDeletedRecord(peerId: spyPeerId, messageId: message.id.id) {
                                 let delDate = DateFormatter.localizedString(from: Date(timeIntervalSince1970: TimeInterval(record.deletionTimestamp)), dateStyle: .short, timeStyle: .short)
-                                infoText += "🗑 Message was deleted by \(record.authorName) at \(delDate).\nOriginal Text:\n\"\(record.text)\"\n\n"
+                                infoText += "🗑 [\(delDate)] \(record.authorName):\n\"\(record.text)\"\n\n"
                             }
                             if !spyEdits.isEmpty {
-                                infoText += "✏️ Edit Revisions History:\n"
+                                infoText += "✏️ \(LightGramStrings.tr("Menu_EditHistory")):\n"
                                 for rev in spyEdits {
                                     let editDate = DateFormatter.localizedString(from: Date(timeIntervalSince1970: TimeInterval(rev.timestamp)), dateStyle: .short, timeStyle: .short)
                                     infoText += "Rev \(rev.revision) (\(editDate)):\nWas: \"\(rev.previousText)\"\nNow: \"\(rev.newText)\"\n\n"
@@ -2500,13 +2501,13 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                             }
                             let alert = textAlertController(
                                 context: context,
-                                title: "Spy Mode Details",
+                                title: isSpyDeleted ? LightGramStrings.tr("Menu_DeletedDetails") : LightGramStrings.tr("Menu_EditHistory"),
                                 text: infoText,
                                 actions: [
-                                    TextAlertAction(type: .defaultAction, title: "Copy Original", action: {
+                                    TextAlertAction(type: .defaultAction, title: LightGramStrings.tr("Menu_CopyOriginal"), action: {
                                         UIPasteboard.general.string = isSpyDeleted ? (LightGramSpyManager.shared.getDeletedRecord(peerId: spyPeerId, messageId: message.id.id)?.text ?? "") : (spyEdits.first?.previousText ?? "")
                                     }),
-                                    TextAlertAction(type: .genericAction, title: "OK", action: {})
+                                    TextAlertAction(type: .genericAction, title: LightGramStrings.tr("OK"), action: {})
                                 ]
                             )
                             controllerInteraction.presentController(alert, nil)

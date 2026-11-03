@@ -67,6 +67,7 @@ swift_library(
         "//submodules/TelegramStringFormatting:TelegramStringFormatting",
         "//submodules/TelegramNotices:TelegramNotices",
         "//submodules/TelegramCallsUI:TelegramCallsUI",
+        "//submodules/LightGramCore:LightGramCore",
         "//submodules/TextFormat:TextFormat",
         "//submodules/MediaPlayer:UniversalMediaPlayer",
         "//submodules/UrlEscaping:UrlEscaping",

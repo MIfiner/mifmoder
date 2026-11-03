@@ -23,6 +23,7 @@ import ThemeAccentColorScreen
 import WallpaperGridScreen
 import PeerNameColorItem
 import DeviceModel
+import LightGramCore
 
 private final class ThemeSettingsControllerArguments {
     let context: AccountContext
@@ -36,6 +37,7 @@ private final class ThemeSettingsControllerArguments {
     let openAutoNightTheme: () -> Void
     let openTextSize: () -> Void
     let openBubbleSettings: () -> Void
+    let openLightGramLogos: () -> Void
     let openPowerSavingSettings: () -> Void
     let openStickersAndEmoji: () -> Void
     let toggleSendWithCmdEnter: (Bool) -> Void
@@ -57,6 +59,7 @@ private final class ThemeSettingsControllerArguments {
         openAutoNightTheme: @escaping () -> Void,
         openTextSize: @escaping () -> Void,
         openBubbleSettings: @escaping () -> Void,
+        openLightGramLogos: @escaping () -> Void,
         openPowerSavingSettings: @escaping () -> Void,
         openStickersAndEmoji: @escaping () -> Void,
         toggleSendWithCmdEnter: @escaping (Bool) -> Void,
@@ -77,6 +80,7 @@ private final class ThemeSettingsControllerArguments {
         self.openAutoNightTheme = openAutoNightTheme
         self.openTextSize = openTextSize
         self.openBubbleSettings = openBubbleSettings
+        self.openLightGramLogos = openLightGramLogos
         self.openPowerSavingSettings = openPowerSavingSettings
         self.openStickersAndEmoji = openStickersAndEmoji
         self.toggleSendWithCmdEnter = toggleSendWithCmdEnter
@@ -131,6 +135,7 @@ private enum ThemeSettingsControllerEntry: ItemListNodeEntry {
     case autoNightTheme(PresentationTheme, String, String)
     case textSize(PresentationTheme, String, String)
     case bubbleSettings(PresentationTheme, String, String)
+    case lightGramLogos(PresentationTheme, String, String)
     case iconHeader(PresentationTheme, String)
     case iconItem(PresentationTheme, PresentationStrings, [PresentationAppIcon], Bool, String?)
     case powerSaving
@@ -254,6 +259,12 @@ private enum ThemeSettingsControllerEntry: ItemListNodeEntry {
                 } else {
                     return false
                 }
+            case let .lightGramLogos(lhsTheme, lhsText, lhsValue):
+                if case let .lightGramLogos(rhsTheme, rhsText, rhsValue) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue {
+                    return true
+                } else {
+                    return false
+                }
             case let .themeListHeader(lhsTheme, lhsText):
                 if case let .themeListHeader(rhsTheme, rhsText) = rhs, lhsTheme === rhsTheme, lhsText == rhsText {
                     return true
@@ -365,6 +376,10 @@ private enum ThemeSettingsControllerEntry: ItemListNodeEntry {
             case let .bubbleSettings(_, text, value):
                 return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: nil, title: text, label: value, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                     arguments.openBubbleSettings()
+                })
+            case let .lightGramLogos(_, text, value):
+                return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: nil, title: text, label: value, labelStyle: .text, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                    arguments.openLightGramLogos()
                 })
             case let .themeListHeader(_, text):
                 return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
@@ -479,6 +494,7 @@ private func themeSettingsControllerEntries(
     }
     entries.append(.textSize(presentationData.theme, strings.Appearance_TextSizeSetting, textSizeValue))
     entries.append(.bubbleSettings(presentationData.theme, strings.Appearance_BubbleCornersSetting, ""))
+    entries.append(.lightGramLogos(presentationData.theme, LightGramStrings.tr("Logos_Title"), ""))
     entries.append(.powerSaving)
     entries.append(.stickersAndEmoji)
     
@@ -604,6 +620,8 @@ public func themeSettingsController(context: AccountContext, focusOnItemTag: The
             let settings = view.entries[ApplicationSpecificSharedDataKeys.presentationThemeSettings]?.get(PresentationThemeSettings.self) ?? PresentationThemeSettings.defaultSettings
             pushControllerImpl?(BubbleSettingsController(context: context, presentationThemeSettings: settings))
         })
+    }, openLightGramLogos: {
+        pushControllerImpl?(LightGramLogosController(context: context))
     }, openPowerSavingSettings: {
         pushControllerImpl?(energySavingSettingsScreen(context: context))
     }, openStickersAndEmoji: {

@@ -339,6 +339,10 @@ alternate_icon_folders = [
     "Premium",
     "PremiumBlack",
     "PremiumTurbo",
+    "AmberIcon",
+    "IceIcon",
+    "VioletIcon",
+    "EmeraldIcon",
 ]
 
 composer_icon_folders = []

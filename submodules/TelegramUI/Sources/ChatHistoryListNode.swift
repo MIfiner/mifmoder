@@ -2716,8 +2716,12 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
             }
             if apply {
                 switch strongSelf.chatLocation {
-                case .peer, .replyThread:
-                    if !strongSelf.context.sharedContext.immediateExperimentalUISettings.skipReadHistory && !strongSelf.context.account.isSupportUser && !LightGramSettings.shared.suppressReadHistory {
+                case let .peer(peerId):
+                    if !strongSelf.context.sharedContext.immediateExperimentalUISettings.skipReadHistory && !strongSelf.context.account.isSupportUser && !LightGramGhostController.shared.shouldSuppressReadHistory(peerId: peerId.toInt64()) {
+                        strongSelf.context.applyMaxReadIndex(for: strongSelf.chatLocation, contextHolder: strongSelf.chatLocationContextHolder, messageIndex: messageIndex)
+                    }
+                case let .replyThread(replyThread):
+                    if !strongSelf.context.sharedContext.immediateExperimentalUISettings.skipReadHistory && !strongSelf.context.account.isSupportUser && !LightGramGhostController.shared.shouldSuppressReadHistory(peerId: replyThread.peerId.toInt64()) {
                         strongSelf.context.applyMaxReadIndex(for: strongSelf.chatLocation, contextHolder: strongSelf.chatLocationContextHolder, messageIndex: messageIndex)
                     }
                 case .customChatContents:
@@ -5008,9 +5012,13 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
             } else if self.interactiveReadActionDisposable == nil {
                 if !self.context.sharedContext.immediateExperimentalUISettings.skipReadHistory && !self.context.account.isSupportUser {
                     if case let .peer(peerId) = self.chatLocation {
-                        self.interactiveReadActionDisposable = self.context.engine.messages.installInteractiveReadMessagesAction(peerId: peerId, threadId: nil)
+                        if !LightGramGhostController.shared.shouldSuppressReadHistory(peerId: peerId.toInt64()) {
+                            self.interactiveReadActionDisposable = self.context.engine.messages.installInteractiveReadMessagesAction(peerId: peerId, threadId: nil)
+                        }
                     } else if case let .replyThread(replyThread) = self.chatLocation, (replyThread.isForumPost || replyThread.isMonoforumPost) {
-                        self.interactiveReadActionDisposable = self.context.engine.messages.installInteractiveReadMessagesAction(peerId: replyThread.peerId, threadId: replyThread.threadId)
+                        if !LightGramGhostController.shared.shouldSuppressReadHistory(peerId: replyThread.peerId.toInt64()) {
+                            self.interactiveReadActionDisposable = self.context.engine.messages.installInteractiveReadMessagesAction(peerId: replyThread.peerId, threadId: replyThread.threadId)
+                        }
                     }
                 }
             }

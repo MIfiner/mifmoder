@@ -10,7 +10,7 @@ public final class LightGramPrivacyCenterController: ViewController, UITableView
     
     public init() {
         super.init(navigationBarPresentationData: makeLightGramNavBarData())
-        self.title = "Privacy & Security Center"
+        self.title = LightGramStrings.tr("PrivacyCenter_Title")
     }
     
     required public init(coder aDecoder: NSCoder) {

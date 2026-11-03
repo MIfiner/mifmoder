@@ -102,7 +102,9 @@ private final class SynchronizePeerReadStatesContextImpl {
                             if let current = strongSelf.activeOperations[peerId], current === activeOperation {
                                 Logger.shared.log("SynchronizePeerReadStates", "\(peerId): operation retry \(operation)")
                                 strongSelf.activeOperations.removeValue(forKey: peerId)
-                                strongSelf.update()
+                                strongSelf.queue.after(1.5, {
+                                    strongSelf.update()
+                                })
                             }
                         }
                     }, completed: { [weak self, weak activeOperation] in

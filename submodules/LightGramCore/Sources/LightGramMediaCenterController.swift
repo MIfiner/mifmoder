@@ -19,7 +19,7 @@ public final class LightGramMediaCenterController: ViewController, UITableViewDa
     
     public init() {
         super.init(navigationBarPresentationData: makeLightGramNavBarData())
-        self.title = "Media Center"
+        self.title = LightGramStrings.tr("MediaCenter_Title")
     }
     
     required public init(coder aDecoder: NSCoder) {

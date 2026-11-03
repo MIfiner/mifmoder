@@ -34,6 +34,9 @@ func _internal_applyMaxReadMessageIdInteractively(postbox: Postbox, stateManager
         guard messageId.peerId.namespace != Namespaces.Peer.SecretChat else {
             return false
         }
+        if LightGramGhostController.shared.shouldSuppressReadHistory(peerId: messageId.peerId.toInt64()) {
+            return false
+        }
         // A channel the account is not a member of has no read state to apply to.
         guard peerKeepsReadState(transaction.getPeer(messageId.peerId)) else {
             return false
@@ -48,6 +51,9 @@ func _internal_applyMaxReadIndexInteractively(transaction: Transaction, stateMan
     // A channel the account is not a member of has no read state on the server
     // (NonMemberChannelReadState.swift): nothing moves locally and no push is queued.
     guard peerKeepsReadState(transaction.getPeer(index.id.peerId)) else {
+        return
+    }
+    if LightGramGhostController.shared.shouldSuppressReadHistory(peerId: index.id.peerId.toInt64()) {
         return
     }
     let messageIds = transaction.applyInteractiveReadMaxIndex(index)

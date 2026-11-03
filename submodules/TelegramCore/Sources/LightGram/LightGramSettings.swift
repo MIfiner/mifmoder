@@ -27,6 +27,7 @@ public final class LightGramSettings {
         public static let forwardWithoutQuoting = "lightgram_forward_without_quoting"
         public static let smartFiltersEnabled = "lightgram_smart_filters_enabled"
         public static let activeFilterIndex = "lightgram_active_filter_index"
+        public static let activeLogoTheme = "lightgram_active_logo_theme"
     }
     
     public init() {
@@ -114,6 +115,27 @@ public final class LightGramSettings {
     }
     
     private func setInt(_ value: Int, forKey key: String) {
+        self.lock.lock()
+        self.memoryCache[key] = value
+        self.userDefaults.set(value, forKey: key)
+        self.persistSettingsLocked()
+        self.lock.unlock()
+    }
+    
+    private func getString(forKey key: String, default defaultValue: String = "") -> String {
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        if let val = self.memoryCache[key] as? String {
+            return val
+        }
+        if let val = self.userDefaults.string(forKey: key) {
+            self.memoryCache[key] = val
+            return val
+        }
+        return defaultValue
+    }
+    
+    private func setString(_ value: String, forKey key: String) {
         self.lock.lock()
         self.memoryCache[key] = value
         self.userDefaults.set(value, forKey: key)
@@ -246,6 +268,16 @@ public final class LightGramSettings {
         }
         set {
             self.setInt(newValue, forKey: Keys.activeFilterIndex)
+        }
+    }
+    
+    public var activeLogoTheme: String {
+        get {
+            return self.getString(forKey: Keys.activeLogoTheme, default: "AmberIcon")
+        }
+        set {
+            self.setString(newValue, forKey: Keys.activeLogoTheme)
+            NotificationCenter.default.post(name: NSNotification.Name("LightGramLogoChanged"), object: nil, userInfo: ["logo": newValue])
         }
     }
 }
