@@ -1489,12 +1489,18 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                                     infoText += "Rev \(rev.revision) (\(editDate)):\nWas: \"\(rev.previousText)\"\nNow: \"\(rev.newText)\"\n\n"
                                 }
                             }
-                            let alert = UIAlertController(title: "Spy Mode Details", message: infoText, preferredStyle: .alert)
-                            alert.addAction(UIAlertAction(title: "Copy Original", style: .default, handler: { _ in
-                                UIPasteboard.general.string = isSpyDeleted ? (LightGramSpyManager.shared.getDeletedRecord(peerId: spyPeerId, messageId: message.id.id)?.text ?? "") : (spyEdits.first?.previousText ?? "")
-                            }))
-                            alert.addAction(UIAlertAction(title: "OK", style: .cancel))
-                            controllerInteraction.presentGlobalOverlayController(alert, nil)
+                            let alert = textAlertController(
+                                context: context,
+                                title: "Spy Mode Details",
+                                text: infoText,
+                                actions: [
+                                    TextAlertAction(type: .defaultAction, title: "Copy Original", action: {
+                                        UIPasteboard.general.string = isSpyDeleted ? (LightGramSpyManager.shared.getDeletedRecord(peerId: spyPeerId, messageId: message.id.id)?.text ?? "") : (spyEdits.first?.previousText ?? "")
+                                    }),
+                                    TextAlertAction(type: .genericAction, title: "OK", action: {})
+                                ]
+                            )
+                            controllerInteraction.presentController(alert, nil)
                             f(.default)
                         })))
                     }
@@ -2492,12 +2498,18 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                                     infoText += "Rev \(rev.revision) (\(editDate)):\nWas: \"\(rev.previousText)\"\nNow: \"\(rev.newText)\"\n\n"
                                 }
                             }
-                            let alert = UIAlertController(title: "Spy Mode Details", message: infoText, preferredStyle: .alert)
-                            alert.addAction(UIAlertAction(title: "Copy Original", style: .default, handler: { _ in
-                                UIPasteboard.general.string = isSpyDeleted ? (LightGramSpyManager.shared.getDeletedRecord(peerId: spyPeerId, messageId: message.id.id)?.text ?? "") : (spyEdits.first?.previousText ?? "")
-                            }))
-                            alert.addAction(UIAlertAction(title: "OK", style: .cancel))
-                            controllerInteraction.presentGlobalOverlayController(alert, nil)
+                            let alert = textAlertController(
+                                context: context,
+                                title: "Spy Mode Details",
+                                text: infoText,
+                                actions: [
+                                    TextAlertAction(type: .defaultAction, title: "Copy Original", action: {
+                                        UIPasteboard.general.string = isSpyDeleted ? (LightGramSpyManager.shared.getDeletedRecord(peerId: spyPeerId, messageId: message.id.id)?.text ?? "") : (spyEdits.first?.previousText ?? "")
+                                    }),
+                                    TextAlertAction(type: .genericAction, title: "OK", action: {})
+                                ]
+                            )
+                            controllerInteraction.presentController(alert, nil)
                             f(.default)
                         })))
                     }
