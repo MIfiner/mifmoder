@@ -29,7 +29,6 @@ import DebugSettingsUI
 import ChatPresentationInterfaceState
 import Pasteboard
 import LightGramCore
-import LightGramCore
 import BrowserUI
 import ChatRichTextEditorComposer
 import SettingsUI
