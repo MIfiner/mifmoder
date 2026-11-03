@@ -136,12 +136,12 @@ public final class LightGramCircleStudioController: ViewController, UIImagePicke
         self.contentView.addSubview(self.circlesCollectionView)
     }
     
-    override public func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        let width = self.view.bounds.width
+    override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+        super.containerLayoutUpdated(layout, transition: transition)
+        let navLayout = self.navigationLayout(layout: layout)
+        let topInset = (self.navigationBar != nil ? navLayout.navigationFrame.maxY : (layout.statusBarHeight ?? 0)) + 10.0
+        let width = layout.size.width
         let padding: CGFloat = 16.0
-        
-        let topInset: CGFloat = self.navigationLayout(layout: ContainerViewLayout(size: self.view.bounds.size, metrics: LayoutMetrics(), deviceMetrics: DeviceMetrics.iPhone12Mini, inset: .zero, safeInsets: self.view.safeAreaInsets, additionalInsets: .zero, statusBarHeight: 44.0, inputHeight: nil, inputHeightIsInteractivellyChanging: false, inVoiceOver: false)).navigationFrame.maxY + 10.0
         
         // Circular Preview (200x200)
         let circleSize: CGFloat = 200.0

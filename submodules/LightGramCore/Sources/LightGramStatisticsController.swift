@@ -107,15 +107,16 @@ public final class LightGramStatisticsController: ViewController {
         }
     }
     
-    override public func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        let width = self.view.bounds.width
+    override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+        super.containerLayoutUpdated(layout, transition: transition)
+        let navLayout = self.navigationLayout(layout: layout)
+        let topInset = (self.navigationBar != nil ? navLayout.navigationFrame.maxY : (layout.statusBarHeight ?? 0)) + 10.0
+        let width = layout.size.width
         let padding: CGFloat = 16.0
-        
-        let topInset: CGFloat = self.navigationLayout(layout: ContainerViewLayout(size: self.view.bounds.size, metrics: LayoutMetrics(), deviceMetrics: DeviceMetrics.iPhone12Mini, inset: .zero, safeInsets: self.view.safeAreaInsets, additionalInsets: .zero, statusBarHeight: 44.0, inputHeight: nil, inputHeightIsInteractivellyChanging: false, inVoiceOver: false)).navigationFrame.maxY + 10.0
         
         self.segmentedControl.frame = CGRect(x: padding, y: topInset, width: width - padding * 2, height: 36)
         self.activityIndicator.center = CGPoint(x: width / 2, y: topInset + 60)
+        self.scrollView.frame = CGRect(x: 0, y: topInset + 46, width: width, height: max(0, layout.size.height - (topInset + 46)))
         
         if let s = self.snapshot {
             self.renderDashboard(snapshot: s)
@@ -404,12 +405,12 @@ public final class LightGramStatisticsController: ViewController {
     
     @objc private func topChatTapped(_ sender: UITapGestureRecognizer) {
         guard let view = sender.view else { return }
-        let peerId = PeerId(Int64(view.tag))
+        let peerId = EnginePeer.Id(Int64(view.tag))
         let _ = (self.context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: peerId))
                  |> deliverOnMainQueue).start(next: { [weak self] peer in
-            guard let self = self, let peer = peer else { return }
+            guard let self = self, let peer = peer, let navigationController = self.navigationController as? NavigationController else { return }
             self.context.sharedContext.navigateToChatController(NavigateToChatControllerParams(
-                navigationController: self.navigationController as? NavigationController,
+                navigationController: navigationController,
                 context: self.context,
                 chatLocation: .peer(peer),
                 subject: nil,

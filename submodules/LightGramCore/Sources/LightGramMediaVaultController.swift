@@ -164,23 +164,23 @@ public final class LightGramMediaVaultController: ViewController, UICollectionVi
         self.view.addSubview(self.emptyLabel)
     }
     
-    override public func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        let width = self.view.bounds.width
-        let height = self.view.bounds.height
+    override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+        super.containerLayoutUpdated(layout, transition: transition)
+        let navLayout = self.navigationLayout(layout: layout)
+        let topInset = (self.navigationBar != nil ? navLayout.navigationFrame.maxY : (layout.statusBarHeight ?? 0)) + 8.0
+        let width = layout.size.width
+        let height = layout.size.height
         let padding: CGFloat = 16.0
-        
-        let topInset: CGFloat = self.navigationLayout(layout: ContainerViewLayout(size: self.view.bounds.size, metrics: LayoutMetrics(), deviceMetrics: DeviceMetrics.iPhone12Mini, inset: .zero, safeInsets: self.view.safeAreaInsets, additionalInsets: .zero, statusBarHeight: 44.0, inputHeight: nil, inputHeightIsInteractivellyChanging: false, inVoiceOver: false)).navigationFrame.maxY + 8.0
         
         self.storageHeaderView.frame = CGRect(x: padding, y: topInset, width: width - padding * 2, height: 40)
         self.searchBar.frame = CGRect(x: 8, y: topInset + 44, width: width - 16, height: 44)
         self.filterScrollView.frame = CGRect(x: 0, y: topInset + 92, width: width, height: 36)
         
         let gridY = topInset + 134
-        self.collectionView.frame = CGRect(x: padding, y: gridY, width: width - padding * 2, height: height - gridY)
+        self.collectionView.frame = CGRect(x: padding, y: gridY, width: width - padding * 2, height: max(0, height - gridY))
         self.emptyLabel.frame = CGRect(x: 32, y: gridY + 80, width: width - 64, height: 60)
         
-        self.lockOverlayView?.frame = self.view.bounds
+        self.lockOverlayView?.frame = CGRect(origin: .zero, size: layout.size)
     }
     
     @objc private func filterTapped(_ sender: UIButton) {
