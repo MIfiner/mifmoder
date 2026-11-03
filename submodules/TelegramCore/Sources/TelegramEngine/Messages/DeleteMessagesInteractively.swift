@@ -163,7 +163,7 @@ func deleteMessagesInteractively(transaction: Transaction, stateManager: Account
         }
     }
     for msg in messageIds {
-        LightGramSpyManager.shared.removeDeletedRecord(peerId: msg.peerId.toInt64(), messageId: msg.id)
+        LightGramSpyManager.shared.removeDeletedRecord(peerId: msg.messageId.peerId.toInt64(), messageId: msg.messageId.id)
     }
     _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: messageIds.map(\.messageId), isInteractive: true)
     
