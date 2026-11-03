@@ -308,5 +308,115 @@ final class LightGramCoreTests: XCTestCase {
         XCTAssertFalse(LightGramStrings.tr("Logos_Title").isEmpty)
         XCTAssertFalse(LightGramStrings.tr("Badge_Deleted").isEmpty)
         XCTAssertFalse(LightGramStrings.tr("Badge_Edited").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("Statistics_Title").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("MediaVault_Title").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("CircleStudio_Title").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("MediaVault_SaveToVault").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("MediaVault_ForwardNormal").isEmpty)
+    }
+    
+    func testMediaVaultOperations() {
+        let vault = LightGramMediaVaultManager.shared
+        
+        // Create dummy file in temp
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
+        let dummyURL = tempDir.appendingPathComponent("test_circle.mp4")
+        try? "dummy media bytes".data(using: .utf8)?.write(to: dummyURL)
+        
+        let expectation = self.expectation(description: "saveDirectFile")
+        
+        vault.saveDirectFile(
+            sourceURL: dummyURL,
+            fileName: "test_circle.mp4",
+            mediaType: "circle",
+            chatTitle: "Test Chat",
+            authorName: "Alice",
+            isOneTime: true,
+            duration: 15.0,
+            dimensions: "720x720"
+        ) { success, _ in
+            XCTAssertTrue(success)
+            
+            let allItems = vault.getItems()
+            let found = allItems.first(where: { $0.fileName == "test_circle.mp4" })
+            XCTAssertNotNil(found)
+            XCTAssertEqual(found?.mediaType, "circle")
+            XCTAssertTrue(found?.isOneTime ?? false)
+            XCTAssertEqual(found?.duration, 15.0)
+            
+            if let itemId = found?.id {
+                // Test toggle favorite
+                let isFav = vault.toggleFavorite(id: itemId)
+                XCTAssertTrue(isFav)
+                
+                let favs = vault.getItems(favoritesOnly: true)
+                XCTAssertTrue(favs.contains(where: { $0.id == itemId }))
+                
+                // Test filter by type
+                let circles = vault.getItems(typeFilter: "circle")
+                XCTAssertTrue(circles.contains(where: { $0.id == itemId }))
+                
+                let photos = vault.getItems(typeFilter: "photo")
+                XCTAssertFalse(photos.contains(where: { $0.id == itemId }))
+                
+                // Test storage analytics
+                XCTAssertTrue(vault.totalStorageBytes() > 0)
+                XCTAssertFalse(vault.formattedStorageSize().isEmpty)
+                
+                // Test delete
+                vault.deleteItem(id: itemId) { deleted in
+                    XCTAssertTrue(deleted)
+                    let remaining = vault.getItems()
+                    XCTAssertFalse(remaining.contains(where: { $0.id == itemId }))
+                    expectation.fulfill()
+                }
+            } else {
+                expectation.fulfill()
+            }
+        }
+        
+        waitForExpectations(timeout: 3.0)
+    }
+    
+    func testStatisticsSnapshotStructure() {
+        let snapshot = LightGramStatisticsSnapshot(
+            periodIndex: 0,
+            startDateTimestamp: 1000,
+            endDateTimestamp: 2000,
+            sentMessagesCount: 42,
+            receivedMessagesCount: 58,
+            totalMessagesCount: 100,
+            activeChatsCount: 5,
+            photosCount: 12,
+            videosCount: 4,
+            circlesCount: 8,
+            voiceCount: 15,
+            filesCount: 3,
+            hourlyActivity: [Int](repeating: 2, count: 24),
+            dailyActivityLabels: ["Mon", "Tue", "Wed"],
+            dailyActivityCounts: [30, 40, 30],
+            topChats: [
+                TopChatStat(peerId: 101, title: "Alice", messageCount: 50, percentage: 50.0, peerType: "user"),
+                TopChatStat(peerId: 102, title: "Dev Group", messageCount: 50, percentage: 50.0, peerType: "group")
+            ],
+            peakDayLabel: "Tue",
+            peakHourLabel: "14:00 - 15:00",
+            averageMessagesPerDay: 14.3,
+            deletedMessagesCount: 6,
+            editedRevisionsCount: 9,
+            vaultItemsCount: 3,
+            vaultStorageFormatted: "12.4 MB",
+            isRealData: true
+        )
+        
+        XCTAssertEqual(snapshot.totalMessagesCount, 100)
+        XCTAssertEqual(snapshot.sentMessagesCount, 42)
+        XCTAssertEqual(snapshot.receivedMessagesCount, 58)
+        XCTAssertEqual(snapshot.activeChatsCount, 5)
+        XCTAssertEqual(snapshot.topChats.count, 2)
+        XCTAssertEqual(snapshot.topChats.first?.percentage, 50.0)
+        XCTAssertTrue(snapshot.isRealData)
+        XCTAssertEqual(snapshot.peakDayLabel, "Tue")
+        XCTAssertEqual(snapshot.peakHourLabel, "14:00 - 15:00")
     }
 }

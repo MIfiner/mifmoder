@@ -14,6 +14,9 @@ public final class LightGramControlCenterController: ViewController, UITableView
             (LightGramStrings.tr("GhostMode_Header"), [
                 (LightGramStrings.tr("GhostMode"), LightGramStrings.tr("GhostMode_Master_Desc"), "👻", "ghost"),
                 (LightGramStrings.tr("SpyMode"), LightGramStrings.tr("SpyMode_Master_Desc"), "🕵️‍♂️", "spy"),
+                (LightGramStrings.tr("Statistics_Title"), LightGramStrings.tr("Statistics_Header"), "📊", "stats"),
+                (LightGramStrings.tr("MediaVault_Title"), LightGramStrings.tr("MediaVault_StorageUsed"), "🛡️", "vault"),
+                (LightGramStrings.tr("CircleStudio_Title"), LightGramStrings.tr("CircleStudio_Header"), "⭕", "circles"),
                 (LightGramStrings.tr("PrivacyCenter_Title"), LightGramStrings.tr("PrivacyCenter_Header"), "🛡", "privacy")
             ]),
             (LightGramStrings.tr("SmartFolders_Header"), [
@@ -105,6 +108,24 @@ public final class LightGramControlCenterController: ViewController, UITableView
             targetController = LightGramSettingsController(context: self.context)
         case "spy":
             targetController = LightGramSpyArchiveController()
+        case "stats":
+            if let context = self.context {
+                targetController = LightGramStatisticsController(context: context)
+            } else {
+                targetController = LightGramSettingsController(context: self.context)
+            }
+        case "vault":
+            if let context = self.context {
+                targetController = LightGramMediaVaultController(context: context)
+            } else {
+                targetController = LightGramSettingsController(context: self.context)
+            }
+        case "circles":
+            if let context = self.context {
+                targetController = LightGramCircleStudioController(context: context)
+            } else {
+                targetController = LightGramSettingsController(context: self.context)
+            }
         case "privacy":
             targetController = LightGramPrivacyCenterController()
         case "folders":

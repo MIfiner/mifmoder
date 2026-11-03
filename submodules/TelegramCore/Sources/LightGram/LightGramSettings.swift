@@ -24,10 +24,13 @@ public final class LightGramSettings {
         public static let retentionDaysTTL = "lightgram_retention_days_ttl"
         
         public static let biometricLockArchive = "lightgram_biometric_lock_archive"
+        public static let biometricLockMediaVault = "lightgram_biometric_lock_media_vault"
+        public static let mediaVaultRetentionDays = "lightgram_media_vault_retention_days"
         public static let forwardWithoutQuoting = "lightgram_forward_without_quoting"
         public static let smartFiltersEnabled = "lightgram_smart_filters_enabled"
         public static let activeFilterIndex = "lightgram_active_filter_index"
         public static let activeLogoTheme = "lightgram_active_logo_theme"
+        public static let statsLastPeriod = "lightgram_stats_last_period"
     }
     
     public init() {
@@ -53,9 +56,12 @@ public final class LightGramSettings {
             Keys.saveEditHistory: true,
             Keys.retentionDaysTTL: 30,
             Keys.biometricLockArchive: false,
+            Keys.biometricLockMediaVault: false,
+            Keys.mediaVaultRetentionDays: 0,
             Keys.forwardWithoutQuoting: false,
             Keys.smartFiltersEnabled: true,
-            Keys.activeFilterIndex: 0
+            Keys.activeFilterIndex: 0,
+            Keys.statsLastPeriod: 0
         ]
         
         self.userDefaults.register(defaults: self.memoryCache)
@@ -241,6 +247,33 @@ public final class LightGramSettings {
         }
         set {
             self.setBool(newValue, forKey: Keys.biometricLockArchive)
+        }
+    }
+    
+    public var biometricLockMediaVault: Bool {
+        get {
+            return self.getBool(forKey: Keys.biometricLockMediaVault, default: false)
+        }
+        set {
+            self.setBool(newValue, forKey: Keys.biometricLockMediaVault)
+        }
+    }
+    
+    public var mediaVaultRetentionDays: Int {
+        get {
+            return self.getInt(forKey: Keys.mediaVaultRetentionDays, default: 0)
+        }
+        set {
+            self.setInt(newValue, forKey: Keys.mediaVaultRetentionDays)
+        }
+    }
+    
+    public var statsLastPeriod: Int {
+        get {
+            return self.getInt(forKey: Keys.statsLastPeriod, default: 0)
+        }
+        set {
+            self.setInt(newValue, forKey: Keys.statsLastPeriod)
         }
     }
     

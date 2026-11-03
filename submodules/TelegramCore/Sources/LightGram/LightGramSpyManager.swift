@@ -149,6 +149,18 @@ public final class LightGramSpyManager {
     }
     
     // MARK: - Synchronous Fast Lookups for Chat Bubbles
+    public func getDeletedRecordCount() -> Int {
+        self.mapLock.lock()
+        defer { self.mapLock.unlock() }
+        return self.deletedMessagesCache.count
+    }
+    
+    public func getEditRecordCount() -> Int {
+        self.mapLock.lock()
+        defer { self.mapLock.unlock() }
+        return self.editedMessagesCache.count
+    }
+    
     public func isMessageDeleted(peerId: Int64, messageId: Int32) -> Bool {
         self.mapLock.lock()
         defer { self.mapLock.unlock() }

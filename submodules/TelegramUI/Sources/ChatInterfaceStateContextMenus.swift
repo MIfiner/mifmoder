@@ -1557,21 +1557,31 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             }
         }
         
-        if resourceAvailable, !message.containsSecretMedia && !isCopyProtected {
+        let isSecretOrOneTime = message.containsSecretMedia || message.attributes.contains(where: { $0 is AutoremoveTimeoutMessageAttribute })
+        let canSaveMedia = resourceAvailable && (!isCopyProtected || isSecretOrOneTime)
+        
+        if canSaveMedia {
             var mediaReference: AnyMediaReference?
             var isVideo = false
+            var targetMedia: Media?
             for media in message.effectiveMedia {
                 if let image = media as? TelegramMediaImage, let _ = largestImageRepresentation(image.representations) {
                     mediaReference = ImageMediaReference.standalone(media: image).abstract
+                    targetMedia = image
                     break
-                } else if let file = media as? TelegramMediaFile, file.isVideo {
+                } else if let file = media as? TelegramMediaFile {
                     mediaReference = FileMediaReference.standalone(media: file).abstract
-                    isVideo = true
+                    targetMedia = file
+                    if file.isVideo || file.isInstantVideo {
+                        isVideo = true
+                    }
                     break
                 }
             }
             if let mediaReference = mediaReference {
-                actions.append(.action(ContextMenuActionItem(text: isVideo ? chatPresentationInterfaceState.strings.Gallery_SaveVideo : chatPresentationInterfaceState.strings.Gallery_SaveImage, icon: { theme in
+                // 1. Save to Gallery / Camera Roll
+                let saveGalleryText = isVideo ? chatPresentationInterfaceState.strings.Gallery_SaveVideo : chatPresentationInterfaceState.strings.Gallery_SaveImage
+                actions.append(.action(ContextMenuActionItem(text: saveGalleryText, icon: { theme in
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Save"), color: theme.actionSheet.primaryTextColor)
                 }, action: { _, f in
                     let _ = (saveToCameraRoll(context: context, userLocation: .peer(message.id.peerId), mediaReference: mediaReference)
@@ -1583,6 +1593,44 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                     })
                     f(.default)
                 })))
+                
+                // 2. LightGram: Save to Media Vault
+                if let targetMedia = targetMedia {
+                    actions.append(.action(ContextMenuActionItem(text: LightGramStrings.tr("MediaVault_SaveToVault"), icon: { theme in
+                        return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Save"), color: LightGramSettings.signatureYellowAccent)
+                    }, action: { _, f in
+                        let authorTitle = message.author?.debugDisplayTitle ?? "Unknown"
+                        let chatTitle = message.peers[message.id.peerId]?.debugDisplayTitle ?? "Chat"
+                        LightGramMediaVaultManager.shared.saveMedia(
+                            peerId: message.id.peerId,
+                            messageId: message.id,
+                            chatTitle: chatTitle,
+                            authorName: authorTitle,
+                            media: targetMedia,
+                            isOneTime: isSecretOrOneTime,
+                            postbox: context.account.postbox
+                        ) { success, msg in
+                            Queue.mainQueue().after(0.2) {
+                                let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+                                let notice = success ? LightGramStrings.tr("MediaVault_SavedNotice") : (msg ?? "Error")
+                                controllerInteraction.presentControllerInCurrent(UndoOverlayController(presentationData: presentationData, content: .mediaSaved(text: notice), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return true }), nil)
+                            }
+                        }
+                        f(.default)
+                    })))
+                }
+                
+                // 3. LightGram: Forward as Normal Photo/Video/Circle (for View Once / Secret Media)
+                if isSecretOrOneTime {
+                    actions.append(.action(ContextMenuActionItem(text: LightGramStrings.tr("MediaVault_ForwardNormal"), icon: { theme in
+                        return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Forward"), color: LightGramSettings.signatureYellowAccent)
+                    }, action: { _, f in
+                        let newAttributes = message.attributes.filter { !($0 is AutoremoveTimeoutMessageAttribute) && !($0 is AutoclearTimeoutMessageAttribute) }
+                        let normalMessage = message.withUpdatedAttributes(newAttributes)
+                        interfaceInteraction.forwardMessages([normalMessage])
+                        f(.dismissWithoutContent)
+                    })))
+                }
             }
         }
         

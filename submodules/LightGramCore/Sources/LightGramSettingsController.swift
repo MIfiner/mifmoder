@@ -146,7 +146,7 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         case .spyMode: return 5
         case .privacyAndSecurity: return 2
         case .smartFilters: return 1
-        case .tools: return 8
+        case .tools: return 11
         }
     }
     
@@ -259,25 +259,37 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
                 cell.textLabel?.text = "Control Center (Dashboard)"
                 cell.accessoryType = .disclosureIndicator
             case 1:
+                cell.textLabel?.text = LightGramStrings.tr("Statistics_Title")
+                cell.detailTextLabel?.text = "Dashboard & Charts"
+                cell.accessoryType = .disclosureIndicator
+            case 2:
+                cell.textLabel?.text = LightGramStrings.tr("MediaVault_Title")
+                cell.detailTextLabel?.text = LightGramMediaVaultManager.shared.formattedStorageSize()
+                cell.accessoryType = .disclosureIndicator
+            case 3:
+                cell.textLabel?.text = LightGramStrings.tr("CircleStudio_Title")
+                cell.detailTextLabel?.text = "1:1 Video Notes"
+                cell.accessoryType = .disclosureIndicator
+            case 4:
                 cell.textLabel?.text = LightGramStrings.tr("Logos_Title")
                 cell.detailTextLabel?.text = LightGramSettings.shared.activeLogoTheme.replacingOccurrences(of: "Icon", with: "")
                 cell.accessoryType = .disclosureIndicator
-            case 2:
+            case 5:
                 cell.textLabel?.text = LightGramStrings.tr("SmartFolders_Title")
                 cell.accessoryType = .disclosureIndicator
-            case 3:
+            case 6:
                 cell.textLabel?.text = LightGramStrings.tr("Notes_Title")
                 cell.accessoryType = .disclosureIndicator
-            case 4:
+            case 7:
                 cell.textLabel?.text = LightGramStrings.tr("MediaCenter_Title")
                 cell.accessoryType = .disclosureIndicator
-            case 5:
+            case 8:
                 cell.textLabel?.text = LightGramStrings.tr("PrivacyCenter_Title")
                 cell.accessoryType = .disclosureIndicator
-            case 6:
+            case 9:
                 cell.textLabel?.text = LightGramStrings.tr("BotManager_Title")
                 cell.accessoryType = .disclosureIndicator
-            case 7:
+            case 10:
                 cell.textLabel?.text = "Network Diagnostics"
                 cell.detailTextLabel?.text = "NWConnection / DC 2"
                 cell.accessoryType = .disclosureIndicator
@@ -313,19 +325,31 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
                 self.push(LightGramControlCenterController(context: self.context))
             case 1:
                 if let context = self.context {
-                    self.push(LightGramLogosController(context: context))
+                    self.push(LightGramStatisticsController(context: context))
                 }
             case 2:
-                self.push(LightGramSmartFoldersController())
+                if let context = self.context {
+                    self.push(LightGramMediaVaultController(context: context))
+                }
             case 3:
-                self.push(LightGramNotesController())
+                if let context = self.context {
+                    self.push(LightGramCircleStudioController(context: context))
+                }
             case 4:
-                self.push(LightGramMediaCenterController())
+                if let context = self.context {
+                    self.push(LightGramLogosController(context: context))
+                }
             case 5:
-                self.push(LightGramPrivacyCenterController())
+                self.push(LightGramSmartFoldersController())
             case 6:
-                self.push(LightGramBotManagerController())
+                self.push(LightGramNotesController())
             case 7:
+                self.push(LightGramMediaCenterController())
+            case 8:
+                self.push(LightGramPrivacyCenterController())
+            case 9:
+                self.push(LightGramBotManagerController())
+            case 10:
                 self.push(LightGramNetworkDiagnosticsController())
             default: break
             }
