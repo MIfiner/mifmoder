@@ -7,6 +7,8 @@ import TelegramCore
 import TelegramPresentationData
 import AccountContext
 import AppBundle
+import PresentationDataUtils
+import AlertUI
 
 public struct LightGramLogoOption {
     public let id: String
@@ -90,7 +92,7 @@ public final class LightGramLogosController: ViewController {
     override public func viewDidLoad() {
         super.viewDidLoad()
         
-        self.view.backgroundColor = LightGramDesignSystem.Colors.pureBlack
+        self.view.backgroundColor = LightGramDesignSystem.Colors.amoledBlack
         self.scrollView.alwaysBounceVertical = true
         self.view.addSubview(self.scrollView)
         
@@ -183,7 +185,7 @@ private final class LightGramLogoCardView: UIControl {
         self.layer.cornerRadius = 16.0
         self.layer.masksToBounds = true
         self.layer.borderWidth = isSelected ? 2.0 : 1.0
-        self.layer.borderColor = isSelected ? option.accentColor.cgColor : LightGramDesignSystem.Colors.separator.cgColor
+        self.layer.borderColor = isSelected ? option.accentColor.cgColor : LightGramDesignSystem.Colors.borderGraphite.cgColor
         
         self.iconImageView.layer.cornerRadius = 14.0
         self.iconImageView.layer.masksToBounds = true
@@ -243,7 +245,7 @@ private final class LightGramLogoCardView: UIControl {
         self.isCurrentlySelected = selected
         UIView.animate(withDuration: 0.2) {
             self.layer.borderWidth = selected ? 2.0 : 1.0
-            self.layer.borderColor = selected ? self.option.accentColor.cgColor : LightGramDesignSystem.Colors.separator.cgColor
+            self.layer.borderColor = selected ? self.option.accentColor.cgColor : LightGramDesignSystem.Colors.borderGraphite.cgColor
             self.checkIndicator.backgroundColor = selected ? self.option.accentColor : UIColor.clear
             self.checkIndicator.layer.borderWidth = selected ? 0.0 : 2.0
         }

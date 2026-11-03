@@ -7,6 +7,7 @@ public enum LightGramDesignSystem {
     public enum Colors {
         /// Pure AMOLED / OLED deep black
         public static let amoledBlack = UIColor(rgb: 0x000000)
+        public static let pureBlack = amoledBlack
         /// Deep charcoal surface background
         public static let deepGraphite = UIColor(rgb: 0x121214)
         /// Primary card surface
@@ -16,6 +17,7 @@ public enum LightGramDesignSystem {
         /// Subtle borders and dividers
         public static let borderGraphite = UIColor(rgb: 0x2C2C2E)
         public static let dividerGraphite = UIColor(rgb: 0x38383A)
+        public static let separator = dividerGraphite
         
         /// Signature LightGram Electric Amber / Gold Accent
         public static let signatureYellow = UIColor(rgb: 0xEDB400)

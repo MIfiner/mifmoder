@@ -18,6 +18,7 @@ swift_library(
         "//submodules/TelegramUIPreferences:TelegramUIPreferences",
         "//submodules/ItemListUI:ItemListUI",
         "//submodules/PresentationDataUtils:PresentationDataUtils",
+        "//submodules/AlertUI:AlertUI",
         "//submodules/AppBundle:AppBundle",
     ],
     visibility = [
