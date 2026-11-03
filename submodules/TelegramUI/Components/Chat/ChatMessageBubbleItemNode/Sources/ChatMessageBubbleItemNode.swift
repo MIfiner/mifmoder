@@ -712,6 +712,8 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
     private var ephemeralBadgeBackgroundNode: ASImageNode?
     private var ephemeralBadgeTextNode: TextNode?
     private var ephemeralBadgeIconNode: UIImageView?
+    private var lightGramSpyBorderNode: ASDisplayNode?
+    private var lightGramSpyBadgeBackgroundNode: ASDisplayNode?
     private var lightGramSpyBadgeNode: TextNode?
 
     private var credibilityIconView: ComponentHostView<Empty>?
@@ -5741,15 +5743,32 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         let spyEditRecords = LightGramSettings.shared.saveEditHistory ? LightGramSpyManager.shared.getEditRecords(peerId: spyPeerId, messageId: spyMessageId) : []
         
         if isSpyDeleted {
-            strongSelf.backgroundNode.layer.borderColor = UIColor(rgb: 0xFF3B30).cgColor
-            strongSelf.backgroundNode.layer.borderWidth = 2.0
-            strongSelf.backgroundNode.layer.cornerRadius = 16.0
-            strongSelf.backgroundNode.layer.masksToBounds = true
+            let borderNode = strongSelf.lightGramSpyBorderNode ?? ASDisplayNode()
+            strongSelf.lightGramSpyBorderNode = borderNode
+            borderNode.isUserInteractionEnabled = false
+            borderNode.layer.borderColor = UIColor(rgb: 0xFF3B30).cgColor
+            borderNode.layer.borderWidth = 2.0
+            borderNode.layer.cornerRadius = 16.0
+            borderNode.backgroundColor = UIColor(rgb: 0xFF3B30).withAlphaComponent(0.08)
+            if borderNode.supernode == nil {
+                strongSelf.mainContextSourceNode.contentNode.addSubnode(borderNode)
+            }
+            borderNode.frame = backgroundFrame
+            
+            let badgeBg = strongSelf.lightGramSpyBadgeBackgroundNode ?? ASDisplayNode()
+            strongSelf.lightGramSpyBadgeBackgroundNode = badgeBg
+            badgeBg.isUserInteractionEnabled = false
+            badgeBg.backgroundColor = UIColor(rgb: 0xFF3B30).withAlphaComponent(0.92)
+            badgeBg.cornerRadius = 9.0
+            if badgeBg.supernode == nil {
+                strongSelf.mainContextSourceNode.contentNode.addSubnode(badgeBg)
+            }
             
             let badgeNode = strongSelf.lightGramSpyBadgeNode ?? TextNode()
             strongSelf.lightGramSpyBadgeNode = badgeNode
+            badgeNode.isUserInteractionEnabled = false
             let (badgeLayout, badgeApply) = TextNode.asyncLayout(badgeNode)(TextNodeLayoutArguments(
-                attributedString: NSAttributedString(string: "🔴 DELETED MESSAGE", font: Font.bold(10.5), textColor: UIColor(rgb: 0xFF3B30)),
+                attributedString: NSAttributedString(string: "🔴 DELETED MESSAGE", font: Font.bold(10.0), textColor: .white),
                 backgroundColor: nil,
                 maximumNumberOfLines: 1,
                 truncationType: .end,
@@ -5760,24 +5779,47 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             ))
             let appliedNode = badgeApply()
             if appliedNode.supernode == nil {
-                strongSelf.clippingNode.addSubnode(appliedNode)
+                strongSelf.mainContextSourceNode.contentNode.addSubnode(appliedNode)
             }
-            appliedNode.frame = CGRect(x: backgroundFrame.minX + 12.0, y: backgroundFrame.minY + 4.0, width: badgeLayout.size.width, height: badgeLayout.size.height)
+            let badgePaddingH: CGFloat = 8.0
+            let badgeHeight: CGFloat = 18.0
+            let badgeWidth = badgeLayout.size.width + badgePaddingH * 2.0
+            let badgeX = backgroundFrame.minX + 10.0
+            let badgeY = max(0.0, backgroundFrame.minY + 4.0)
+            badgeBg.frame = CGRect(x: badgeX, y: badgeY, width: badgeWidth, height: badgeHeight)
+            appliedNode.frame = CGRect(x: badgeX + badgePaddingH, y: badgeY + (badgeHeight - badgeLayout.size.height) * 0.5, width: badgeLayout.size.width, height: badgeLayout.size.height)
         } else if !spyEditRecords.isEmpty {
-            strongSelf.backgroundNode.layer.borderColor = UIColor(rgb: 0xEDB400).cgColor
-            strongSelf.backgroundNode.layer.borderWidth = 1.5
-            strongSelf.backgroundNode.layer.cornerRadius = 16.0
-            strongSelf.backgroundNode.layer.masksToBounds = true
-            
             let lastEdit = spyEditRecords.first!
             let editSnippet = lastEdit.previousText.trimmingCharacters(in: .whitespacesAndNewlines)
-            let snippet = editSnippet.count > 30 ? String(editSnippet.prefix(30)) + "..." : editSnippet
+            let snippet = editSnippet.count > 25 ? String(editSnippet.prefix(25)) + "…" : editSnippet
             let badgeText = "🟡 EDITED [Rev \(lastEdit.revision)]: \"\(snippet)\""
+            
+            let borderNode = strongSelf.lightGramSpyBorderNode ?? ASDisplayNode()
+            strongSelf.lightGramSpyBorderNode = borderNode
+            borderNode.isUserInteractionEnabled = false
+            borderNode.layer.borderColor = UIColor(rgb: 0xEDB400).cgColor
+            borderNode.layer.borderWidth = 1.5
+            borderNode.layer.cornerRadius = 16.0
+            borderNode.backgroundColor = UIColor(rgb: 0xEDB400).withAlphaComponent(0.06)
+            if borderNode.supernode == nil {
+                strongSelf.mainContextSourceNode.contentNode.addSubnode(borderNode)
+            }
+            borderNode.frame = backgroundFrame
+            
+            let badgeBg = strongSelf.lightGramSpyBadgeBackgroundNode ?? ASDisplayNode()
+            strongSelf.lightGramSpyBadgeBackgroundNode = badgeBg
+            badgeBg.isUserInteractionEnabled = false
+            badgeBg.backgroundColor = UIColor(rgb: 0xEDB400).withAlphaComponent(0.92)
+            badgeBg.cornerRadius = 9.0
+            if badgeBg.supernode == nil {
+                strongSelf.mainContextSourceNode.contentNode.addSubnode(badgeBg)
+            }
             
             let badgeNode = strongSelf.lightGramSpyBadgeNode ?? TextNode()
             strongSelf.lightGramSpyBadgeNode = badgeNode
+            badgeNode.isUserInteractionEnabled = false
             let (badgeLayout, badgeApply) = TextNode.asyncLayout(badgeNode)(TextNodeLayoutArguments(
-                attributedString: NSAttributedString(string: badgeText, font: Font.semibold(10.0), textColor: UIColor(rgb: 0xEDB400)),
+                attributedString: NSAttributedString(string: badgeText, font: Font.semibold(10.0), textColor: .black),
                 backgroundColor: nil,
                 maximumNumberOfLines: 1,
                 truncationType: .end,
@@ -5788,11 +5830,25 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             ))
             let appliedNode = badgeApply()
             if appliedNode.supernode == nil {
-                strongSelf.clippingNode.addSubnode(appliedNode)
+                strongSelf.mainContextSourceNode.contentNode.addSubnode(appliedNode)
             }
-            appliedNode.frame = CGRect(x: backgroundFrame.minX + 12.0, y: backgroundFrame.minY + 4.0, width: badgeLayout.size.width, height: badgeLayout.size.height)
+            let badgePaddingH: CGFloat = 8.0
+            let badgeHeight: CGFloat = 18.0
+            let badgeWidth = badgeLayout.size.width + badgePaddingH * 2.0
+            let badgeX = backgroundFrame.minX + 10.0
+            let badgeY = max(0.0, backgroundFrame.minY + 4.0)
+            badgeBg.frame = CGRect(x: badgeX, y: badgeY, width: badgeWidth, height: badgeHeight)
+            appliedNode.frame = CGRect(x: badgeX + badgePaddingH, y: badgeY + (badgeHeight - badgeLayout.size.height) * 0.5, width: badgeLayout.size.width, height: badgeLayout.size.height)
         } else {
             strongSelf.backgroundNode.layer.borderWidth = 0.0
+            if let borderNode = strongSelf.lightGramSpyBorderNode {
+                borderNode.removeFromSupernode()
+                strongSelf.lightGramSpyBorderNode = nil
+            }
+            if let badgeBg = strongSelf.lightGramSpyBadgeBackgroundNode {
+                badgeBg.removeFromSupernode()
+                strongSelf.lightGramSpyBadgeBackgroundNode = nil
+            }
             if let badgeNode = strongSelf.lightGramSpyBadgeNode {
                 badgeNode.removeFromSupernode()
                 strongSelf.lightGramSpyBadgeNode = nil

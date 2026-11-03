@@ -112,44 +112,40 @@ public final class LightGramSpyManager {
             FileAttributeKey.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication
         ])
         
-        self.loadFromDisk()
+        self.loadFromDiskSync()
     }
     
-    private func loadFromDisk() {
-        self.queue.async { [weak self] in
-            guard let self = self else { return }
-            
-            var loadedDeleted: [SpyDeletedMessageRecord] = []
-            if let deletedData = try? Data(contentsOf: self.deletedMessagesFile),
-               let records = try? JSONDecoder().decode([SpyDeletedMessageRecord].self, from: deletedData) {
-                loadedDeleted = records
-                self.deletedMessagesCache = records
-            }
-            
-            var loadedEdits: [SpyEditRecord] = []
-            if let editedData = try? Data(contentsOf: self.editedMessagesFile),
-               let records = try? JSONDecoder().decode([SpyEditRecord].self, from: editedData) {
-                loadedEdits = records
-                self.editedMessagesCache = records
-            }
-            
-            self.mapLock.lock()
-            self.deletedMap.removeAll()
-            for record in loadedDeleted {
-                self.deletedMap[record.id] = record
-            }
-            self.editedMap.removeAll()
-            for record in loadedEdits {
-                let key = "\(record.peerId)_\(record.messageId)"
-                var list = self.editedMap[key] ?? []
-                list.append(record)
-                self.editedMap[key] = list
-            }
-            self.mapLock.unlock()
-            
-            self.hasLoadedCache = true
-            self.enforceTTL()
+    private func loadFromDiskSync() {
+        var loadedDeleted: [SpyDeletedMessageRecord] = []
+        if let deletedData = try? Data(contentsOf: self.deletedMessagesFile),
+           let records = try? JSONDecoder().decode([SpyDeletedMessageRecord].self, from: deletedData) {
+            loadedDeleted = records
+            self.deletedMessagesCache = records
         }
+        
+        var loadedEdits: [SpyEditRecord] = []
+        if let editedData = try? Data(contentsOf: self.editedMessagesFile),
+           let records = try? JSONDecoder().decode([SpyEditRecord].self, from: editedData) {
+            loadedEdits = records
+            self.editedMessagesCache = records
+        }
+        
+        self.mapLock.lock()
+        self.deletedMap.removeAll()
+        for record in loadedDeleted {
+            self.deletedMap[record.id] = record
+        }
+        self.editedMap.removeAll()
+        for record in loadedEdits {
+            let key = "\(record.peerId)_\(record.messageId)"
+            var list = self.editedMap[key] ?? []
+            list.append(record)
+            self.editedMap[key] = list
+        }
+        self.mapLock.unlock()
+        
+        self.hasLoadedCache = true
+        self.enforceTTL()
     }
     
     // MARK: - Synchronous Fast Lookups for Chat Bubbles
@@ -188,6 +184,18 @@ public final class LightGramSpyManager {
         self.mapLock.lock()
         self.deletedMap[key] = record
         self.mapLock.unlock()
+    }
+    
+    public func removeDeletedRecord(peerId: Int64, messageId: Int32) {
+        let key = "\(peerId)_\(messageId)"
+        self.mapLock.lock()
+        self.deletedMap.removeValue(forKey: key)
+        self.mapLock.unlock()
+        self.queue.async { [weak self] in
+            guard let self = self else { return }
+            self.deletedMessagesCache.removeAll(where: { $0.id == key })
+            self.persistDeletedMessages()
+        }
     }
     
     private func persistDeletedMessages() {
@@ -327,33 +335,32 @@ public final class LightGramSpyManager {
         let nTrimmed = newText.trimmingCharacters(in: .whitespacesAndNewlines)
         if pTrimmed.isEmpty || pTrimmed == nTrimmed { return }
         
+        let now = Int32(Date().timeIntervalSince1970)
+        let key = "\(peerId)_\(messageId)"
+        
+        self.mapLock.lock()
+        var list = self.editedMap[key] ?? []
+        let revNum = list.count + 1
+        let record = SpyEditRecord(
+            peerId: peerId,
+            messageId: messageId,
+            chatTitle: chatTitle.isEmpty ? "Chat" : chatTitle,
+            authorName: authorName.isEmpty ? "Unknown" : authorName,
+            previousText: previousText,
+            newText: newText,
+            timestamp: now,
+            revision: revNum
+        )
+        list.insert(record, at: 0)
+        self.editedMap[key] = list
+        self.mapLock.unlock()
+        
         self.queue.async { [weak self] in
             guard let self = self else { return }
-            let now = Int32(Date().timeIntervalSince1970)
-            let existingRevs = self.editedMessagesCache.filter { $0.peerId == peerId && $0.messageId == messageId }
-            let revNum = existingRevs.count + 1
-            
-            let record = SpyEditRecord(
-                peerId: peerId,
-                messageId: messageId,
-                chatTitle: chatTitle.isEmpty ? "Chat" : chatTitle,
-                authorName: authorName.isEmpty ? "Unknown" : authorName,
-                previousText: previousText,
-                newText: newText,
-                timestamp: now,
-                revision: revNum
-            )
-            
             self.editedMessagesCache.insert(record, at: 0)
             if self.editedMessagesCache.count > 10000 {
                 self.editedMessagesCache.removeLast()
             }
-            let key = "\(peerId)_\(messageId)"
-            self.mapLock.lock()
-            var list = self.editedMap[key] ?? []
-            list.append(record)
-            self.editedMap[key] = list
-            self.mapLock.unlock()
             self.persistEditedMessages()
         }
     }

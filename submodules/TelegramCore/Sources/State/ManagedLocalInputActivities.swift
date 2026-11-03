@@ -79,6 +79,9 @@ func managedLocalTypingActivities(activities: Signal<[PeerActivitySpace: [(PeerI
     return Signal { subscriber in
         let context = Atomic(value: ManagedLocalTypingActivitiesContext())
         let disposable = activities.start(next: { activities in
+            if LightGramSettings.shared.suppressTyping {
+                return
+            }
             let (start, dispose) = context.with { context in
                 return context.update(activities: activities)
             }
@@ -142,6 +145,9 @@ private func actionFromActivity(_ activity: PeerInputActivity?) -> Api.SendMessa
 }
 
 private func requestActivity(postbox: Postbox, network: Network, accountPeerId: PeerId, peerId: PeerId, threadId: Int64?, activity: PeerInputActivity?) -> Signal<Void, NoError> {
+    if LightGramSettings.shared.suppressTyping {
+        return .complete()
+    }
     return postbox.transaction { transaction -> Signal<Void, NoError> in
         if let peer = transaction.getPeer(peerId) {
             if peerId == accountPeerId {

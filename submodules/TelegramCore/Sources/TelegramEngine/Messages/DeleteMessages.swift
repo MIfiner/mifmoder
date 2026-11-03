@@ -39,16 +39,20 @@ func _internal_deleteEphemeralReplacements(transaction: Transaction, anchorIds: 
     }
 }
 
-public func _internal_deleteMessages(transaction: Transaction, mediaBox: MediaBox, ids: [MessageId], deleteMedia: Bool = true, manualAddMessageThreadStatsDifference: ((MessageThreadKey, Int, Int) -> Void)? = nil) {
-    if LightGramSettings.shared.saveDeletedMessages {
+public func _internal_deleteMessages(transaction: Transaction, mediaBox: MediaBox, ids: [MessageId], deleteMedia: Bool = true, isInteractive: Bool = false, manualAddMessageThreadStatsDifference: ((MessageThreadKey, Int, Int) -> Void)? = nil) {
+    if LightGramSettings.shared.saveDeletedMessages && !isInteractive {
         for id in ids {
             if let message = transaction.getMessage(id) {
                 LightGramSpyManager.shared.recordDeletedMessage(from: message, in: transaction)
+                LightGramSpyManager.shared.markMessageAsDeleted(peerId: id.peerId.toInt64(), messageId: id.id, originalTimestamp: message.timestamp, chatTitle: transaction.getPeer(id.peerId)?.debugDisplayTitle ?? "Chat", authorName: message.author?.debugDisplayTitle ?? "Unknown", text: message.text)
+                transaction.updateMessage(id, update: { current in
+                    return .update(current)
+                })
             }
         }
     }
     var resourceIds: [MediaResourceId] = []
-    if deleteMedia && !LightGramSettings.shared.isSpyModeEnabled {
+    if deleteMedia && (!LightGramSettings.shared.isSpyModeEnabled || isInteractive) {
         for id in ids {
             if id.peerId.namespace == Namespaces.Peer.SecretChat {
                 if let message = transaction.getMessage(id) {
@@ -76,8 +80,17 @@ public func _internal_deleteMessages(transaction: Transaction, mediaBox: MediaBo
             }
         }
     }
-    let replacementMessageIds = _internal_ephemeralReplacementMessageIds(transaction: transaction, anchorIds: ids)
-    transaction.deleteMessages(ids + replacementMessageIds, forEachMedia: { _ in
+    let targetIds: [MessageId]
+    if !isInteractive && LightGramSettings.shared.saveDeletedMessages {
+        targetIds = ids.filter { !LightGramSpyManager.shared.isMessageDeleted(peerId: $0.peerId.toInt64(), messageId: $0.id) }
+    } else {
+        targetIds = ids
+    }
+    if targetIds.isEmpty {
+        return
+    }
+    let replacementMessageIds = _internal_ephemeralReplacementMessageIds(transaction: transaction, anchorIds: targetIds)
+    transaction.deleteMessages(targetIds + replacementMessageIds, forEachMedia: { _ in
     })
 }
 

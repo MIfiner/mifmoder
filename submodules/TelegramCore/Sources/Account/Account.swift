@@ -1373,11 +1373,18 @@ public class Account {
         
         self.contactSyncManager = ContactSyncManager(postbox: postbox, network: network, accountPeerId: peerId, stateManager: self.stateManager)
         self.localInputActivityManager = PeerInputActivityManager()
-        self.accountPresenceManager = AccountPresenceManager(shouldKeepOnlinePresence: self.shouldKeepOnlinePresence.get(), network: network)
+        let effectiveShouldKeepOnlinePresence: Signal<Bool, NoError> = combineLatest(
+            self.shouldKeepOnlinePresence.get(),
+            LightGramSettings.ghostModePromise.get()
+        )
+        |> map { shouldKeepOnline, isGhostMode in
+            return shouldKeepOnline && !isGhostMode
+        }
+        self.accountPresenceManager = AccountPresenceManager(shouldKeepOnlinePresence: effectiveShouldKeepOnlinePresence, network: network)
         #if os(iOS)
         // iOS only for now: the Rust engine is the macOS default, and its online keepalive cadence
         // (pings every 1-2 s while the account is in front) has not been measured there.
-        network.isUserOnline.set(self.shouldKeepOnlinePresence.get())
+        network.isUserOnline.set(effectiveShouldKeepOnlinePresence)
         #endif
         let _ = (postbox.transaction { transaction -> Void in
             transaction.updatePeerPresencesInternal(presences: [peerId: TelegramUserPresence(status: .present(until: Int32.max - 1), lastActivity: 0)], merge: { _, updated in return updated })

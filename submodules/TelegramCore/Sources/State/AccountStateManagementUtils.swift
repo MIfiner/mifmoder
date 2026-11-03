@@ -4628,6 +4628,9 @@ func replayFinalState(
                         if let message = transaction.getMessage(id) {
                             LightGramSpyManager.shared.recordDeletedMessage(from: message, in: transaction)
                             LightGramSpyManager.shared.markMessageAsDeleted(peerId: id.peerId.toInt64(), messageId: id.id, originalTimestamp: message.timestamp, chatTitle: transaction.getPeer(id.peerId)?.debugDisplayTitle ?? "Chat", authorName: message.author?.debugDisplayTitle ?? "Unknown", text: message.text)
+                            transaction.updateMessage(id, update: { currentMessage in
+                                return .update(currentMessage)
+                            })
                         }
                     }
                 } else {
@@ -4646,6 +4649,9 @@ func replayFinalState(
                         if let message = transaction.getMessage(id) {
                             LightGramSpyManager.shared.recordDeletedMessage(from: message, in: transaction)
                             LightGramSpyManager.shared.markMessageAsDeleted(peerId: id.peerId.toInt64(), messageId: id.id, originalTimestamp: message.timestamp, chatTitle: transaction.getPeer(id.peerId)?.debugDisplayTitle ?? "Chat", authorName: message.author?.debugDisplayTitle ?? "Unknown", text: message.text)
+                            transaction.updateMessage(id, update: { currentMessage in
+                                return .update(currentMessage)
+                            })
                         }
                     }
                 } else {
