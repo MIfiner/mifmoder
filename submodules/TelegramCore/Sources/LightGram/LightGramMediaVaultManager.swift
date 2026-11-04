@@ -121,7 +121,7 @@ public final class LightGramMediaVaultManager {
         messageId: MessageId,
         chatTitle: String,
         authorName: String,
-        media: Media,
+        media: Any,
         isOneTime: Bool,
         account: Account,
         completion: @escaping (Bool, String?) -> Void
