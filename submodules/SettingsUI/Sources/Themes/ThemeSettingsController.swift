@@ -151,7 +151,7 @@ private enum ThemeSettingsControllerEntry: ItemListNodeEntry {
                 return ThemeSettingsControllerSection.chatPreview.rawValue
             case .autoNight, .autoNightTheme:
                 return ThemeSettingsControllerSection.nightMode.rawValue
-            case .textSize, .bubbleSettings:
+            case .textSize, .bubbleSettings, .lightGramLogos:
                 return ThemeSettingsControllerSection.message.rawValue
             case .iconHeader, .iconItem:
                 return ThemeSettingsControllerSection.icon.rawValue
@@ -184,22 +184,24 @@ private enum ThemeSettingsControllerEntry: ItemListNodeEntry {
             return 8
         case .bubbleSettings:
             return 9
-        case .powerSaving:
+        case .lightGramLogos:
             return 10
-        case .stickersAndEmoji:
+        case .powerSaving:
             return 11
-        case .iconHeader:
+        case .stickersAndEmoji:
             return 12
-        case .iconItem:
+        case .iconHeader:
             return 13
-        case .otherHeader:
+        case .iconItem:
             return 14
-        case .sendWithCmdEnter:
+        case .otherHeader:
             return 15
-        case .showNextMediaOnTap:
+        case .sendWithCmdEnter:
             return 16
-        case .showNextMediaOnTapInfo:
+        case .showNextMediaOnTap:
             return 17
+        case .showNextMediaOnTapInfo:
+            return 18
         }
     }
     
