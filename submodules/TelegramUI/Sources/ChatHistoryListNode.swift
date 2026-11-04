@@ -5014,10 +5014,14 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
                     if case let .peer(peerId) = self.chatLocation {
                         if !LightGramGhostController.shared.shouldSuppressReadHistory(peerId: peerId.toInt64()) {
                             self.interactiveReadActionDisposable = self.context.engine.messages.installInteractiveReadMessagesAction(peerId: peerId, threadId: nil)
+                        } else {
+                            self.interactiveReadActionDisposable = ActionDisposable {}
                         }
                     } else if case let .replyThread(replyThread) = self.chatLocation, (replyThread.isForumPost || replyThread.isMonoforumPost) {
                         if !LightGramGhostController.shared.shouldSuppressReadHistory(peerId: replyThread.peerId.toInt64()) {
                             self.interactiveReadActionDisposable = self.context.engine.messages.installInteractiveReadMessagesAction(peerId: replyThread.peerId, threadId: replyThread.threadId)
+                        } else {
+                            self.interactiveReadActionDisposable = ActionDisposable {}
                         }
                     }
                 }

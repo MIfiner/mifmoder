@@ -996,10 +996,31 @@ private func validateBatch(postbox: Postbox, network: Network, transaction: Tran
                                         if !LightGramSpyManager.shared.isMessageDeleted(peerId: id.peerId.toInt64(), messageId: id.id), let message = transaction.getMessage(id) {
                                             LightGramSpyManager.shared.recordDeletedMessage(from: message, in: transaction)
                                             LightGramSpyManager.shared.markMessageAsDeleted(peerId: id.peerId.toInt64(), messageId: id.id, originalTimestamp: message.timestamp, chatTitle: transaction.getPeer(id.peerId)?.debugDisplayTitle ?? "Chat", authorName: message.author?.debugDisplayTitle ?? "Unknown", text: message.text)
-                                            transaction.updateMessage(id, update: { currentMessage in
-                                                return .update(StoreMessage(message: currentMessage))
-                                            })
                                         }
+                                        transaction.updateMessage(id, update: { currentMessage in
+                                            var storeForwardInfo: StoreMessageForwardInfo?
+                                            if let forwardInfo = currentMessage.forwardInfo {
+                                                storeForwardInfo = StoreMessageForwardInfo(authorId: forwardInfo.author?.id, sourceId: forwardInfo.source?.id, sourceMessageId: forwardInfo.sourceMessageId, date: forwardInfo.date, authorSignature: forwardInfo.authorSignature, psaType: forwardInfo.psaType, flags: forwardInfo.flags)
+                                            }
+                                            var attributes = currentMessage.attributes
+                                            for i in (0 ..< attributes.count).reversed() {
+                                                switch historyState {
+                                                    case .channel:
+                                                        if let _ = attributes[i] as? ChannelMessageStateVersionAttribute {
+                                                            attributes.remove(at: i)
+                                                        }
+                                                    default:
+                                                        break
+                                                }
+                                            }
+                                            switch historyState {
+                                                case let .channel(_, channelState):
+                                                    attributes.append(ChannelMessageStateVersionAttribute(pts: channelState.pts))
+                                                default:
+                                                    break
+                                            }
+                                            return .update(StoreMessage(id: currentMessage.id, customStableId: currentMessage.stableId, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
+                                        })
                                     } else {
                                         _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: [id])
                                         Logger.shared.log("HistoryValidation", "deleting message \(id) in \(id.peerId)")
@@ -1189,10 +1210,23 @@ private func validateReplyThreadBatch(postbox: Postbox, network: Network, transa
                                 if !LightGramSpyManager.shared.isMessageDeleted(peerId: id.peerId.toInt64(), messageId: id.id), let message = transaction.getMessage(id) {
                                     LightGramSpyManager.shared.recordDeletedMessage(from: message, in: transaction)
                                     LightGramSpyManager.shared.markMessageAsDeleted(peerId: id.peerId.toInt64(), messageId: id.id, originalTimestamp: message.timestamp, chatTitle: transaction.getPeer(id.peerId)?.debugDisplayTitle ?? "Chat", authorName: message.author?.debugDisplayTitle ?? "Unknown", text: message.text)
-                                    transaction.updateMessage(id, update: { currentMessage in
-                                        return .update(StoreMessage(message: currentMessage))
-                                    })
                                 }
+                                transaction.updateMessage(id, update: { currentMessage in
+                                    var storeForwardInfo: StoreMessageForwardInfo?
+                                    if let forwardInfo = currentMessage.forwardInfo {
+                                        storeForwardInfo = StoreMessageForwardInfo(authorId: forwardInfo.author?.id, sourceId: forwardInfo.source?.id, sourceMessageId: forwardInfo.sourceMessageId, date: forwardInfo.date, authorSignature: forwardInfo.authorSignature, psaType: forwardInfo.psaType, flags: forwardInfo.flags)
+                                    }
+                                    var attributes = currentMessage.attributes
+                                    if let channelPts = channelPts {
+                                        for i in (0 ..< attributes.count).reversed() {
+                                            if let _ = attributes[i] as? ChannelMessageStateVersionAttribute {
+                                                attributes.remove(at: i)
+                                            }
+                                        }
+                                        attributes.append(ChannelMessageStateVersionAttribute(pts: channelPts))
+                                    }
+                                    return .update(StoreMessage(id: currentMessage.id, customStableId: currentMessage.stableId, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
+                                })
                             } else {
                                 _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: [id])
                                 Logger.shared.log("HistoryValidation", "deleting thread message \(id) in \(id.peerId)")

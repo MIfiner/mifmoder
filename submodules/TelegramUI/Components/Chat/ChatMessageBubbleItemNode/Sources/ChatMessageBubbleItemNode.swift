@@ -5742,9 +5742,12 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         let isSpyDeleted = LightGramSettings.shared.saveDeletedMessages && LightGramSpyManager.shared.isMessageDeleted(peerId: spyPeerId, messageId: spyMessageId)
         let spyEditRecords = LightGramSettings.shared.saveEditHistory ? LightGramSpyManager.shared.getEditRecords(peerId: spyPeerId, messageId: spyMessageId) : []
         
-        if isSpyDeleted {
+        let canRenderSpyDecoration = !hideBackground && !backgroundFrame.isNull && !backgroundFrame.isEmpty && !backgroundFrame.isInfinite && backgroundFrame.width >= 50.0 && backgroundFrame.height >= 20.0
+        
+        if canRenderSpyDecoration && isSpyDeleted {
             let borderNode = strongSelf.lightGramSpyBorderNode ?? ASDisplayNode()
             strongSelf.lightGramSpyBorderNode = borderNode
+            borderNode.displaysAsynchronously = false
             borderNode.isUserInteractionEnabled = false
             borderNode.layer.borderColor = UIColor(rgb: 0xFF3B30).cgColor
             borderNode.layer.borderWidth = 2.0
@@ -5757,6 +5760,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             
             let badgeBg = strongSelf.lightGramSpyBadgeBackgroundNode ?? ASDisplayNode()
             strongSelf.lightGramSpyBadgeBackgroundNode = badgeBg
+            badgeBg.displaysAsynchronously = false
             badgeBg.isUserInteractionEnabled = false
             badgeBg.backgroundColor = UIColor(rgb: 0x1C1C1E)
             badgeBg.layer.borderColor = UIColor(rgb: 0xFF3B30).cgColor
@@ -5768,13 +5772,15 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             
             let badgeNode = strongSelf.lightGramSpyBadgeNode ?? TextNode()
             strongSelf.lightGramSpyBadgeNode = badgeNode
+            badgeNode.displaysAsynchronously = false
             badgeNode.isUserInteractionEnabled = false
+            let maxBadgeW = max(20.0, backgroundFrame.width - 28.0)
             let (badgeLayout, badgeApply) = TextNode.asyncLayout(badgeNode)(TextNodeLayoutArguments(
                 attributedString: NSAttributedString(string: "🔴 DELETED", font: Font.bold(9.5), textColor: .white),
                 backgroundColor: nil,
                 maximumNumberOfLines: 1,
                 truncationType: .end,
-                constrainedSize: CGSize(width: max(20.0, backgroundFrame.width - 24.0), height: 16.0),
+                constrainedSize: CGSize(width: maxBadgeW, height: 16.0),
                 alignment: .natural,
                 cutout: nil,
                 insets: UIEdgeInsets()
@@ -5785,18 +5791,20 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             }
             let badgePaddingH: CGFloat = 6.0
             let badgeHeight: CGFloat = 16.0
-            let badgeWidth = badgeLayout.size.width + badgePaddingH * 2.0
+            let badgeWidth = min(backgroundFrame.width - 12.0, badgeLayout.size.width + badgePaddingH * 2.0)
             let isIncoming = item.message.effectivelyIncoming(item.context.account.peerId)
-            let badgeX = isIncoming ? (backgroundFrame.minX + 14.0) : (backgroundFrame.maxX - badgeWidth - 14.0)
+            let rawBadgeX = isIncoming ? (backgroundFrame.minX + 14.0) : (backgroundFrame.maxX - badgeWidth - 14.0)
+            let badgeX = max(backgroundFrame.minX, min(backgroundFrame.maxX - badgeWidth, rawBadgeX))
             let badgeY = max(0.0, backgroundFrame.minY - badgeHeight * 0.5)
             badgeBg.frame = CGRect(x: badgeX, y: badgeY, width: badgeWidth, height: badgeHeight)
             appliedNode.frame = CGRect(x: badgeX + badgePaddingH, y: badgeY + (badgeHeight - badgeLayout.size.height) * 0.5, width: badgeLayout.size.width, height: badgeLayout.size.height)
-        } else if !spyEditRecords.isEmpty {
+        } else if canRenderSpyDecoration && !spyEditRecords.isEmpty {
             let lastEdit = spyEditRecords.first!
             let badgeText = "🟡 EDITED / REV \(lastEdit.revision)"
             
             let borderNode = strongSelf.lightGramSpyBorderNode ?? ASDisplayNode()
             strongSelf.lightGramSpyBorderNode = borderNode
+            borderNode.displaysAsynchronously = false
             borderNode.isUserInteractionEnabled = false
             borderNode.layer.borderColor = UIColor(rgb: 0xEDB400).cgColor
             borderNode.layer.borderWidth = 1.5
@@ -5809,6 +5817,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             
             let badgeBg = strongSelf.lightGramSpyBadgeBackgroundNode ?? ASDisplayNode()
             strongSelf.lightGramSpyBadgeBackgroundNode = badgeBg
+            badgeBg.displaysAsynchronously = false
             badgeBg.isUserInteractionEnabled = false
             badgeBg.backgroundColor = UIColor(rgb: 0x1C1C1E)
             badgeBg.layer.borderColor = UIColor(rgb: 0xEDB400).cgColor
@@ -5820,13 +5829,15 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             
             let badgeNode = strongSelf.lightGramSpyBadgeNode ?? TextNode()
             strongSelf.lightGramSpyBadgeNode = badgeNode
+            badgeNode.displaysAsynchronously = false
             badgeNode.isUserInteractionEnabled = false
+            let maxBadgeW = max(20.0, backgroundFrame.width - 28.0)
             let (badgeLayout, badgeApply) = TextNode.asyncLayout(badgeNode)(TextNodeLayoutArguments(
                 attributedString: NSAttributedString(string: badgeText, font: Font.bold(9.5), textColor: UIColor(rgb: 0xFFD60A)),
                 backgroundColor: nil,
                 maximumNumberOfLines: 1,
                 truncationType: .end,
-                constrainedSize: CGSize(width: max(20.0, backgroundFrame.width - 24.0), height: 16.0),
+                constrainedSize: CGSize(width: maxBadgeW, height: 16.0),
                 alignment: .natural,
                 cutout: nil,
                 insets: UIEdgeInsets()
@@ -5837,9 +5848,10 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             }
             let badgePaddingH: CGFloat = 6.0
             let badgeHeight: CGFloat = 16.0
-            let badgeWidth = badgeLayout.size.width + badgePaddingH * 2.0
+            let badgeWidth = min(backgroundFrame.width - 12.0, badgeLayout.size.width + badgePaddingH * 2.0)
             let isIncoming = item.message.effectivelyIncoming(item.context.account.peerId)
-            let badgeX = isIncoming ? (backgroundFrame.minX + 14.0) : (backgroundFrame.maxX - badgeWidth - 14.0)
+            let rawBadgeX = isIncoming ? (backgroundFrame.minX + 14.0) : (backgroundFrame.maxX - badgeWidth - 14.0)
+            let badgeX = max(backgroundFrame.minX, min(backgroundFrame.maxX - badgeWidth, rawBadgeX))
             let badgeY = max(0.0, backgroundFrame.minY - badgeHeight * 0.5)
             badgeBg.frame = CGRect(x: badgeX, y: badgeY, width: badgeWidth, height: badgeHeight)
             appliedNode.frame = CGRect(x: badgeX + badgePaddingH, y: badgeY + (badgeHeight - badgeLayout.size.height) * 0.5, width: badgeLayout.size.width, height: badgeLayout.size.height)
