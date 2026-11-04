@@ -481,6 +481,7 @@ official_apple_pay_merchants = [
 official_bundle_ids = [
     "ph.telegra.Telegraph",
     "org.telegram.Telegram-iOS",
+    "site.lightgram.ios",
 ]
 
 store_bundle_ids = [
@@ -573,7 +574,7 @@ official_notification_filtering_fragment = """
 <key>com.apple.developer.usernotifications.filtering</key>
 <true/>
 """
-notification_filtering_fragment = official_notification_filtering_fragment if telegram_bundle_id == "ph.telegra.Telegraph" else ""
+notification_filtering_fragment = official_notification_filtering_fragment if (telegram_bundle_id in official_bundle_ids) else ""
 
 store_signin_fragment = """
 <key>com.apple.developer.applesignin</key>
@@ -587,7 +588,7 @@ official_background_gpu_fragment = """
 <key>com.apple.developer.background-tasks.continued-processing.gpu</key>
 <true/>
 """
-background_gpu_fragment = official_background_gpu_fragment if telegram_bundle_id == "ph.telegra.Telegraph" else ""
+background_gpu_fragment = official_background_gpu_fragment if (telegram_bundle_id in official_bundle_ids) else ""
 
 plist_fragment(
     name = "TelegramEntitlements",
@@ -1219,8 +1220,20 @@ swift_library(
     ]
 )'''
 
+plist_fragment(
+    name = "NotificationContentEntitlements",
+    extension = "entitlements",
+    template = """
+<key>com.apple.security.application-groups</key>
+<array>
+    <string>group.{telegram_bundle_id}</string>
+</array>
+""".format(telegram_bundle_id = telegram_bundle_id),
+)
+
 ios_extension(
     name = "NotificationContentExtension",
+    entitlements = ":NotificationContentEntitlements.entitlements",
     bundle_id = "{telegram_bundle_id}.NotificationContent".format(
         telegram_bundle_id = telegram_bundle_id,
     ),
@@ -1653,8 +1666,22 @@ plist_fragment(
     )
 )
 
+plist_fragment(
+    name = "NotificationServiceEntitlements",
+    extension = "entitlements",
+    template = """
+<key>com.apple.security.application-groups</key>
+<array>
+    <string>group.{telegram_bundle_id}</string>
+</array>
+<key>com.apple.developer.usernotifications.filtering</key>
+<true/>
+""".format(telegram_bundle_id = telegram_bundle_id),
+)
+
 ios_extension(
     name = "NotificationServiceExtension" + notificationServiceExtensionVersion,
+    entitlements = ":NotificationServiceEntitlements.entitlements",
     bundle_id = "{telegram_bundle_id}.NotificationService".format(
         telegram_bundle_id = telegram_bundle_id,
     ),

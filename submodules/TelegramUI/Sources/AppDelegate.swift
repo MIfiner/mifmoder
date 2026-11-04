@@ -337,6 +337,9 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             return current
         } else {
             let promise = Promise<Data>()
+            if let cached = UserDefaults.standard.data(forKey: "LightGramLastDeviceToken") {
+                promise.set(.single(cached))
+            }
             self._notificationTokenPromise = promise
             
             return promise
@@ -1666,6 +1669,22 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         
         if #available(iOS 13.0, *) {
             let cleanupTaskId = "\(baseAppBundleId).cleanup"
+            let refreshTaskId = "\(baseAppBundleId).refresh"
+            
+            BGTaskScheduler.shared.register(forTaskWithIdentifier: refreshTaskId, using: DispatchQueue.main) { task in
+                Logger.shared.log("App \(self.episodeId)", "Executing BGAppRefreshTask")
+                task.expirationHandler = {
+                    task.setTaskCompleted(success: false)
+                }
+                let _ = (self.sharedContextPromise.get()
+                |> take(1)
+                |> deliverOnMainQueue).start(next: { sharedApplicationContext in
+                    sharedApplicationContext.wakeupManager.allowBackgroundTimeExtension(timeout: 25.0)
+                    Queue.mainQueue().after(20.0, {
+                        task.setTaskCompleted(success: true)
+                    })
+                })
+            }
             
             BGTaskScheduler.shared.register(forTaskWithIdentifier: cleanupTaskId, using: DispatchQueue.main) { task in
                 Logger.shared.log("App \(self.episodeId)", "Executing cleanup task")
@@ -1683,6 +1702,11 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             }
             
             BGTaskScheduler.shared.getPendingTaskRequests(completionHandler: { tasks in
+                if !tasks.contains(where: { $0.identifier == refreshTaskId }) {
+                    let refreshRequest = BGAppRefreshTaskRequest(identifier: refreshTaskId)
+                    refreshRequest.earliestBeginDate = Date(timeIntervalSinceNow: 15.0 * 60.0)
+                    try? BGTaskScheduler.shared.submit(refreshRequest)
+                }
                 if tasks.contains(where: { $0.identifier == cleanupTaskId }) {
                     Logger.shared.log("App \(self.episodeId)", "Already have a cleanup task pending")
                     return
@@ -1698,6 +1722,8 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                 }
             })
         }
+        
+        application.setMinimumBackgroundFetchInterval(UIApplication.backgroundFetchIntervalMinimum)
         
         let timestamp = Int(CFAbsoluteTimeGetCurrent())
         let minReindexTimestamp = timestamp - 2 * 24 * 60 * 60
@@ -2208,6 +2234,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
     }
     
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        UserDefaults.standard.set(deviceToken, forKey: "LightGramLastDeviceToken")
         Logger.shared.log("App \(self.episodeId)", "register for notifications: didRegisterForRemoteNotificationsWithDeviceToken (deviceToken: \(hexString(deviceToken)))")
         self.notificationTokenPromise.set(.single(deviceToken))
     }
@@ -2279,6 +2306,18 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                 completionHandler(.newData)
             }, timeout: 29.0)
             sharedApplicationContext.notificationManager.addNotification(userInfo)
+        })
+    }
+
+    func application(_ application: UIApplication, performFetchWithCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        Logger.shared.log("App \(self.episodeId)", "performFetchWithCompletionHandler invoked")
+        let _ = (self.sharedContextPromise.get()
+        |> take(1)
+        |> deliverOnMainQueue).start(next: { sharedApplicationContext in
+            sharedApplicationContext.wakeupManager.allowBackgroundTimeExtension(timeout: 20.0)
+            Queue.mainQueue().after(15.0, {
+                completionHandler(.newData)
+            })
         })
     }
 
@@ -3185,67 +3224,80 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         notificationCenter.getNotificationSettings(completionHandler: { settings in
             Logger.shared.log("App \(self.episodeId)", "register for notifications: received settings: \(settings.authorizationStatus)")
             
-            switch (settings.authorizationStatus, authorize) {
-                case (.authorized, _), (.notDetermined, true):
-                    var authorizationOptions: UNAuthorizationOptions = [.badge, .sound, .alert, .carPlay]
-                    if #available(iOS 12.0, *) {
-                        authorizationOptions.insert(.providesAppNotificationSettings)
+            let registerCategoriesAndRemoteNotifications: () -> Void = {
+                Queue.mainQueue().async {
+                    let reply = UNTextInputNotificationAction(identifier: "reply", title: replyString, options: [], textInputButtonTitle: replyString, textInputPlaceholder: messagePlaceholderString)
+                                                        
+                    let unknownMessageCategory: UNNotificationCategory
+                    let repliableMessageCategory: UNNotificationCategory
+                    let repliableMediaMessageCategory: UNNotificationCategory
+                    let groupRepliableMessageCategory: UNNotificationCategory
+                    let groupRepliableMediaMessageCategory: UNNotificationCategory
+                    let channelMessageCategory: UNNotificationCategory
+                    let reactionMessageCategory: UNNotificationCategory
+                    let storyCategory: UNNotificationCategory
+                    let storyReactionCategory: UNNotificationCategory
+                    
+                    var options: UNNotificationCategoryOptions = []
+                    if includeNames {
+                        options.insert(.hiddenPreviewsShowTitle)
                     }
-                    Logger.shared.log("App \(self.episodeId)", "register for notifications: request authorization")
-                    notificationCenter.requestAuthorization(options: authorizationOptions, completionHandler: { result, _ in
-                        Logger.shared.log("App \(self.episodeId)", "register for notifications: received authorization: \(result)")
-                        completion(result)
-                        if result {
-                            Queue.mainQueue().async {
-                                let reply = UNTextInputNotificationAction(identifier: "reply", title: replyString, options: [], textInputButtonTitle: replyString, textInputPlaceholder: messagePlaceholderString)
-                                                                    
-                                let unknownMessageCategory: UNNotificationCategory
-                                let repliableMessageCategory: UNNotificationCategory
-                                let repliableMediaMessageCategory: UNNotificationCategory
-                                let groupRepliableMessageCategory: UNNotificationCategory
-                                let groupRepliableMediaMessageCategory: UNNotificationCategory
-                                let channelMessageCategory: UNNotificationCategory
-                                let reactionMessageCategory: UNNotificationCategory
-                                let storyCategory: UNNotificationCategory
-                                let storyReactionCategory: UNNotificationCategory
-                                
-                                var options: UNNotificationCategoryOptions = []
-                                if includeNames {
-                                    options.insert(.hiddenPreviewsShowTitle)
-                                }
-                                
-                                var carPlayOptions = options
-                                carPlayOptions.insert(.allowInCarPlay)
-                                
-                                unknownMessageCategory = UNNotificationCategory(identifier: "unknown", actions: [], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: options)
-                                repliableMessageCategory = UNNotificationCategory(identifier: "r", actions: [reply], intentIdentifiers: [INSearchForMessagesIntentIdentifier], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: carPlayOptions)
-                                repliableMediaMessageCategory = UNNotificationCategory(identifier: "m", actions: [reply], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: carPlayOptions)
-                                groupRepliableMessageCategory = UNNotificationCategory(identifier: "gr", actions: [reply], intentIdentifiers: [INSearchForMessagesIntentIdentifier], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: carPlayOptions)
-                                groupRepliableMediaMessageCategory = UNNotificationCategory(identifier: "gm", actions: [reply], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: carPlayOptions)
-                                channelMessageCategory = UNNotificationCategory(identifier: "c", actions: [], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: options)
-                                reactionMessageCategory = UNNotificationCategory(identifier: "t", actions: [], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenReactionContentString, options: options)
-                                storyCategory = UNNotificationCategory(identifier: "st", actions: [], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenStoryContentString, options: options)
-                                storyReactionCategory = UNNotificationCategory(identifier: "str", actions: [], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenStoryReactionContentString, options: options)
-                                
-                                UNUserNotificationCenter.current().setNotificationCategories([
-                                    unknownMessageCategory,
-                                    repliableMessageCategory,
-                                    repliableMediaMessageCategory,
-                                    channelMessageCategory,
-                                    reactionMessageCategory,
-                                    groupRepliableMessageCategory,
-                                    groupRepliableMediaMessageCategory,
-                                    storyCategory,
-                                    storyReactionCategory
-                                ])
-                                
-                                Logger.shared.log("App \(self.episodeId)", "register for notifications: invoke registerForRemoteNotifications")
-                                UIApplication.shared.registerForRemoteNotifications()
-                            }
-                        }
-                    })
-                default:
-                    break
+                    
+                    var carPlayOptions = options
+                    carPlayOptions.insert(.allowInCarPlay)
+                    
+                    unknownMessageCategory = UNNotificationCategory(identifier: "unknown", actions: [], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: options)
+                    repliableMessageCategory = UNNotificationCategory(identifier: "r", actions: [reply], intentIdentifiers: [INSearchForMessagesIntentIdentifier], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: carPlayOptions)
+                    repliableMediaMessageCategory = UNNotificationCategory(identifier: "m", actions: [reply], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: carPlayOptions)
+                    groupRepliableMessageCategory = UNNotificationCategory(identifier: "gr", actions: [reply], intentIdentifiers: [INSearchForMessagesIntentIdentifier], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: carPlayOptions)
+                    groupRepliableMediaMessageCategory = UNNotificationCategory(identifier: "gm", actions: [reply], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: carPlayOptions)
+                    channelMessageCategory = UNNotificationCategory(identifier: "c", actions: [], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: options)
+                    reactionMessageCategory = UNNotificationCategory(identifier: "t", actions: [], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenReactionContentString, options: options)
+                    storyCategory = UNNotificationCategory(identifier: "st", actions: [], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenStoryContentString, options: options)
+                    storyReactionCategory = UNNotificationCategory(identifier: "str", actions: [], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenStoryReactionContentString, options: options)
+                    
+                    UNUserNotificationCenter.current().setNotificationCategories([
+                        unknownMessageCategory,
+                        repliableMessageCategory,
+                        repliableMediaMessageCategory,
+                        channelMessageCategory,
+                        reactionMessageCategory,
+                        groupRepliableMessageCategory,
+                        groupRepliableMediaMessageCategory,
+                        storyCategory,
+                        storyReactionCategory
+                    ])
+                    
+                    Logger.shared.log("App \(self.episodeId)", "register for notifications: invoke registerForRemoteNotifications")
+                    UIApplication.shared.registerForRemoteNotifications()
+                }
+            }
+
+            var isAuthorized = false
+            if #available(iOS 12.0, *) {
+                isAuthorized = (settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional)
+            } else {
+                isAuthorized = (settings.authorizationStatus == .authorized)
+            }
+
+            if isAuthorized {
+                registerCategoriesAndRemoteNotifications()
+                completion(true)
+            } else if settings.authorizationStatus == .notDetermined && authorize {
+                var authorizationOptions: UNAuthorizationOptions = [.badge, .sound, .alert, .carPlay]
+                if #available(iOS 12.0, *) {
+                    authorizationOptions.insert(.providesAppNotificationSettings)
+                }
+                Logger.shared.log("App \(self.episodeId)", "register for notifications: request authorization")
+                notificationCenter.requestAuthorization(options: authorizationOptions, completionHandler: { result, _ in
+                    Logger.shared.log("App \(self.episodeId)", "register for notifications: received authorization: \(result)")
+                    completion(result)
+                    if result {
+                        registerCategoriesAndRemoteNotifications()
+                    }
+                })
+            } else {
+                completion(false)
             }
         })
     }
@@ -3256,9 +3308,15 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         |> deliverOnMainQueue).start(next: { accountId in
             if let context = self.contextValue {
                 if let accountId = accountId, context.context.account.id != accountId || notification.request.content.userInfo["url"] != nil {
-                    completionHandler([.banner, .list])
+                    if #available(iOS 14.0, *) {
+                        completionHandler([.banner, .list, .badge, .sound])
+                    } else {
+                        completionHandler([.alert, .badge, .sound])
+                    }
+                    return
                 }
             }
+            completionHandler([])
         })
     }
     

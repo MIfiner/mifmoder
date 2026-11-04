@@ -158,6 +158,29 @@ private enum AddedAccountsResult {
 
 private var testHasInstance = false
 
+private func isCurrentAppSandboxEnvironment() -> Bool {
+    if let profilePath = Bundle.main.path(forResource: "embedded", ofType: "mobileprovision"),
+       let data = try? Data(contentsOf: URL(fileURLWithPath: profilePath)),
+       let string = String(data: data, encoding: .ascii) {
+        if let range = string.range(of: "<key>aps-environment</key>") {
+            let rest = string[range.upperBound...]
+            if let stringStart = rest.range(of: "<string>"), let stringEnd = rest.range(of: "</string>") {
+                let env = rest[stringStart.upperBound..<stringEnd.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
+                if env == "development" {
+                    return true
+                } else if env == "production" {
+                    return false
+                }
+            }
+        }
+    }
+    #if DEBUG
+    return true
+    #else
+    return false
+    #endif
+}
+
 public final class SharedAccountContextImpl: SharedAccountContext {
     public let mainWindow: Window1?
     public let applicationBindings: TelegramApplicationBindings
@@ -349,12 +372,7 @@ public final class SharedAccountContextImpl: SharedAccountContext {
             guard let data else {
                 return nil
             }
-            let sandbox: Bool
-            #if DEBUG
-            sandbox = true
-            #else
-            sandbox = false
-            #endif
+            let sandbox = isCurrentAppSandboxEnvironment()
             return AuthorizationCodePushNotificationConfiguration(
                 token: hexString(data),
                 isSandbox: sandbox
@@ -1646,12 +1664,8 @@ public final class SharedAccountContextImpl: SharedAccountContext {
     }
     
     public func updateNotificationTokensRegistration() {
-        let sandbox: Bool
-        #if DEBUG
-        sandbox = true
-        #else
-        sandbox = false
-        #endif
+        let sandbox = isCurrentAppSandboxEnvironment()
+        Logger.shared.log("SharedAccountContext", "updateNotificationTokensRegistration: detected APNs sandbox=\(sandbox)")
         
         let settings = self.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.inAppNotificationSettings])
         |> map { sharedData -> (allAccounts: Bool, includeMuted: Bool) in

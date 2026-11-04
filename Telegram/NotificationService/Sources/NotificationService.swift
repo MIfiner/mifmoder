@@ -789,7 +789,7 @@ private final class NotificationServiceHandler {
         let languagesCategory = "ios"
 
         let appGroupName = "group.\(baseAppBundleId)"
-        try! PasscodeEnvironment.shared.configure(PasscodeConfiguration(appGroupIdentifier: appGroupName, processRole: .appExtension))
+        let _ = try? PasscodeEnvironment.shared.configure(PasscodeConfiguration(appGroupIdentifier: appGroupName, processRole: .appExtension))
         let maybeAppGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName)
 
         guard let appGroupUrl = maybeAppGroupUrl else {
@@ -2713,7 +2713,7 @@ final class NotificationService: UNNotificationServiceExtension {
         let content = self.content
 
         self.impl = QueueLocalObject(queue: queue, generate: { [weak self] in
-            return BoxedNotificationServiceHandler(value: NotificationServiceHandler(
+            let handler = NotificationServiceHandler(
                 queue: queue,
                 episode: episode,
                 updateCurrentContent: { value in
@@ -2741,7 +2741,20 @@ final class NotificationService: UNNotificationServiceExtension {
                 },
                 requestIdentifier: request.identifier,
                 payload: request.content.userInfo
-            ))
+            )
+            if handler == nil {
+                // If handler initialization failed (e.g., App Group sandbox restriction in sideloaded environment),
+                // deliver initial notification immediately instead of stalling for 30s until watchdog expires.
+                Queue.mainQueue().async {
+                    if let strongSelf = self, let contentHandler = strongSelf.contentHandler {
+                        strongSelf.contentHandler = nil
+                        if let initialContent = strongSelf.initialContent {
+                            contentHandler(initialContent)
+                        }
+                    }
+                }
+            }
+            return BoxedNotificationServiceHandler(value: handler)
         })
     }
     
