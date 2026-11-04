@@ -28,6 +28,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup MSVC Developer Environment (x64)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
       - name: Install Qt 6 (MSVC 2022 x64)
         uses: jurplel/install-qt-action@v4
         with:
@@ -53,24 +58,26 @@ jobs:
           }
           makensis /VERSION
 
-      - name: Configure CMake
+      - name: Configure CMake (Ninja)
         shell: pwsh
         run: |
           cd desktop
-          cmake -B build_win -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+          cmake -B build_win -G "Ninja" -DCMAKE_BUILD_TYPE=Release
 
       - name: Build Desktop & Tests
         shell: pwsh
         run: |
           cd desktop/build_win
-          cmake --build . --config Release --target lightgram-desktop test_lightgram --parallel
+          cmake --build . --config Release --parallel
 
       - name: Deploy Qt dependencies to build directory
         shell: pwsh
         run: |
           cd desktop/build_win
-          windeployqt.exe --no-translations --compiler-runtime .\Release\LightGram.exe
-          Get-ChildItem .\Release
+          $exeDir = if (Test-Path ".\Release\LightGram.exe") { ".\Release" } else { "." }
+          Write-Host "Deploying Qt dependencies to $exeDir\LightGram.exe using windeployqt..."
+          windeployqt.exe --no-translations --compiler-runtime "$exeDir\LightGram.exe"
+          Get-ChildItem $exeDir
 
       - name: Run Unit Tests
         shell: pwsh
@@ -78,7 +85,9 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           cd desktop/build_win
-          .\Release\test_lightgram.exe
+          $exeDir = if (Test-Path ".\Release\test_lightgram.exe") { ".\Release" } else { "." }
+          Write-Host "Running unit test executable: $exeDir\test_lightgram.exe"
+          & "$exeDir\test_lightgram.exe"
 
       - name: Verify Application Execution (Smoke Test)
         shell: pwsh
@@ -86,17 +95,18 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           cd desktop/build_win
+          $exeDir = if (Test-Path ".\Release\LightGram.exe") { ".\Release" } else { "." }
           Write-Host "Checking LightGram --version..."
-          .\Release\LightGram.exe --version
+          & "$exeDir\LightGram.exe" --version
           Write-Host "Running LightGram --smoke-test..."
-          .\Release\LightGram.exe --smoke-test
+          & "$exeDir\LightGram.exe" --smoke-test
           Write-Host "Application smoke test passed successfully."
 
       - name: Generate Installer and Portable ZIP with CPack
         shell: pwsh
         run: |
           cd desktop/build_win
-          cpack -G "NSIS;ZIP" -C Release
+          cpack -G "NSIS;ZIP"
           
           if (Test-Path "LightGram-1.0.0-Windows-x64.exe") {
             Copy-Item "LightGram-1.0.0-Windows-x64.exe" "LightGram-1.0.0-Windows-x64-Setup.exe" -Force
