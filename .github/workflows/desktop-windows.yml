@@ -31,11 +31,10 @@ jobs:
       - name: Install Qt 6 (MSVC 2022 x64)
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.6.3'
+          version: '6.8.2'
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
-          modules: 'qtsvg'
           cache: false
 
       - name: Verify NSIS installation
