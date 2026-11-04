@@ -116,7 +116,7 @@ jobs:
           }
           
           Write-Host "Testing silent installation of LightGram-1.0.0-Windows-x64-Setup.exe to $testInstallDir..."
-          $proc = Start-Process -FilePath ".\LightGram-1.0.0-Windows-x64-Setup.exe" -ArgumentList "/S /D=$testInstallDir" -PassThru -Wait
+          $proc = Start-Process -FilePath ".\LightGram-1.0.0-Windows-x64-Setup.exe" -ArgumentList @("/S", "/D=$testInstallDir") -PassThru -Wait
           Write-Host "Installer finished with exit code: $($proc.ExitCode)"
           
           $installedExe = "$testInstallDir\LightGram.exe"
