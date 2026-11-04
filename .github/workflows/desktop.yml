@@ -1,0 +1,139 @@
+name: LightGram Desktop CI
+
+on:
+  push:
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop.yml'
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    name: Linux (Ubuntu x64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build build-essential qt6-base-dev libqt6svg6-dev libssl-dev
+
+      - name: Configure CMake
+        run: |
+          cd desktop
+          mkdir build && cd build
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Desktop & Tests
+        run: |
+          cd desktop/build
+          ninja
+
+      - name: Run Unit Tests
+        run: |
+          cd desktop/build
+          QT_QPA_PLATFORM=offscreen ./test_lightgram
+
+      - name: Package Distribution (.deb & .tar.gz)
+        run: |
+          cd desktop/build
+          cpack
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lightgram-desktop-linux
+          path: |
+            desktop/build/*.deb
+            desktop/build/*.tar.gz
+
+  build-windows:
+    name: Windows (x64 MSVC)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt 6
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.6.0'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2022_64'
+          modules: 'qtsvg'
+
+      - name: Configure CMake
+        run: |
+          cd desktop
+          mkdir build
+          cd build
+          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cd desktop/build
+          cmake --build . --config Release --parallel
+
+      - name: Run Unit Tests
+        run: |
+          cd desktop/build
+          ctest -C Release --output-on-failure
+
+      - name: Package Distribution (NSIS / Zip)
+        run: |
+          cd desktop/build
+          cpack -C Release
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lightgram-desktop-windows
+          path: |
+            desktop/build/*.exe
+            desktop/build/*.zip
+        continue-on-error: true
+
+  build-macos:
+    name: macOS (Universal2)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt 6
+        run: |
+          brew install qt6 cmake ninja
+
+      - name: Configure CMake
+        run: |
+          cd desktop
+          mkdir build && cd build
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$(brew --prefix qt6)"
+
+      - name: Build
+        run: |
+          cd desktop/build
+          ninja
+
+      - name: Run Unit Tests
+        run: |
+          cd desktop/build
+          QT_QPA_PLATFORM=offscreen ./test_lightgram
+
+      - name: Package macOS App / DMG
+        run: |
+          cd desktop/build
+          cpack
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lightgram-desktop-macos
+          path: |
+            desktop/build/*.dmg
+            desktop/build/*.tar.gz
+        continue-on-error: true

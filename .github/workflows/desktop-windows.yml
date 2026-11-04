@@ -1,0 +1,179 @@
+name: LightGram Desktop — Windows x64 Build & Test
+
+on:
+  push:
+    branches:
+      - lightgram-v1
+      - master
+      - main
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop-windows.yml'
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build-windows:
+    name: Windows x64 (MSVC 2022 + Qt 6)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Qt 6 (MSVC 2022 x64)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.6.3'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2022_64'
+          modules: 'qtsvg'
+          cache: false
+
+      - name: Verify NSIS installation
+        shell: pwsh
+        run: |
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+            Write-Host "makensis not found in PATH, checking default NSIS location..."
+            if (Test-Path "C:\Program Files (x86)\NSIS\makensis.exe") {
+              "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+              $env:PATH = "C:\Program Files (x86)\NSIS;" + $env:PATH
+            } else {
+              choco install nsis -y
+              "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+              $env:PATH = "C:\Program Files (x86)\NSIS;" + $env:PATH
+            }
+          }
+          makensis /VERSION
+
+      - name: Configure CMake
+        shell: pwsh
+        run: |
+          cd desktop
+          cmake -B build_win -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Desktop & Tests
+        shell: pwsh
+        run: |
+          cd desktop/build_win
+          cmake --build . --config Release --target lightgram-desktop test_lightgram --parallel
+
+      - name: Deploy Qt dependencies to build directory
+        shell: pwsh
+        run: |
+          cd desktop/build_win
+          windeployqt.exe --no-translations --compiler-runtime .\Release\LightGram.exe
+          Get-ChildItem .\Release
+
+      - name: Run Unit Tests
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          cd desktop/build_win
+          .\Release\test_lightgram.exe
+
+      - name: Verify Application Execution (Smoke Test)
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          cd desktop/build_win
+          Write-Host "Checking LightGram --version..."
+          .\Release\LightGram.exe --version
+          Write-Host "Running LightGram --smoke-test..."
+          .\Release\LightGram.exe --smoke-test
+          Write-Host "Application smoke test passed successfully."
+
+      - name: Generate Installer and Portable ZIP with CPack
+        shell: pwsh
+        run: |
+          cd desktop/build_win
+          cpack -G "NSIS;ZIP" -C Release
+          
+          if (Test-Path "LightGram-1.0.0-Windows-x64.exe") {
+            Copy-Item "LightGram-1.0.0-Windows-x64.exe" "LightGram-1.0.0-Windows-x64-Setup.exe" -Force
+          }
+          
+          Write-Host "Listing generated distribution files:"
+          Get-ChildItem -Path . -Filter "LightGram-1.0.0-Windows-x64*"
+
+      - name: Test Installer & Post-Installation Execution
+        shell: pwsh
+        run: |
+          cd desktop/build_win
+          $testInstallDir = "C:\Temp\LightGramInstallTest"
+          if (Test-Path $testInstallDir) {
+            Remove-Item -Recurse -Force $testInstallDir
+          }
+          
+          Write-Host "Testing silent installation of LightGram-1.0.0-Windows-x64-Setup.exe to $testInstallDir..."
+          $proc = Start-Process -FilePath ".\LightGram-1.0.0-Windows-x64-Setup.exe" -ArgumentList "/S /D=$testInstallDir" -PassThru -Wait
+          Write-Host "Installer finished with exit code: $($proc.ExitCode)"
+          
+          $installedExe = "$testInstallDir\LightGram.exe"
+          if (-not (Test-Path $installedExe)) {
+            throw "CRITICAL: Installed binary was not found at $installedExe!"
+          }
+          Write-Host "Verified installed binary: $installedExe"
+          
+          $requiredDlls = @(
+            "$testInstallDir\Qt6Core.dll",
+            "$testInstallDir\Qt6Gui.dll",
+            "$testInstallDir\Qt6Widgets.dll",
+            "$testInstallDir\platforms\qwindows.dll"
+          )
+          foreach ($dll in $requiredDlls) {
+            if (-not (Test-Path $dll)) {
+              throw "CRITICAL: Required deployed dependency missing from installation: $dll"
+            }
+          }
+          Write-Host "All essential Qt DLLs and platform plugins verified in install directory."
+          
+          Write-Host "Testing launch of installed application..."
+          $env:QT_QPA_PLATFORM = "offscreen"
+          & $installedExe --version
+          & $installedExe --smoke-test
+          Write-Host "Installed application execution verified successfully!"
+
+      - name: Test Portable ZIP Archive Extraction & Execution
+        shell: pwsh
+        run: |
+          cd desktop/build_win
+          $zipFile = "LightGram-1.0.0-Windows-x64.zip"
+          $extractDir = "C:\Temp\LightGramZipExtractTest"
+          if (Test-Path $extractDir) {
+            Remove-Item -Recurse -Force $extractDir
+          }
+          
+          Write-Host "Testing portable ZIP extraction: $zipFile..."
+          Expand-Archive -Path $zipFile -DestinationPath $extractDir -Force
+          
+          $portableExe = Get-ChildItem -Path $extractDir -Recurse -Filter "LightGram.exe" | Select-Object -First 1
+          if (-not $portableExe) {
+            throw "CRITICAL: LightGram.exe not found inside portable ZIP archive!"
+          }
+          Write-Host "Found portable executable at: $($portableExe.FullName)"
+          
+          Write-Host "Testing launch of portable application..."
+          $env:QT_QPA_PLATFORM = "offscreen"
+          & $portableExe.FullName --version
+          & $portableExe.FullName --smoke-test
+          Write-Host "Portable ZIP application execution verified successfully!"
+
+      - name: Upload Windows x64 Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: LightGram-1.0.0-Windows-x64
+          path: |
+            desktop/build_win/LightGram-1.0.0-Windows-x64-Setup.exe
+            desktop/build_win/LightGram-1.0.0-Windows-x64.zip
+          if-no-files-found: error

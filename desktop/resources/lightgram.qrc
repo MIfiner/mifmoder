@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file alias="amber.png">icons/01_LightGram_Amber.png</file>
+        <file alias="ice.png">icons/02_LightGram_Ice.png</file>
+        <file alias="violet.png">icons/03_LightGram_Violet.png</file>
+        <file alias="emerald.png">icons/04_LightGram_Emerald.png</file>
+    </qresource>
+</RCC>
