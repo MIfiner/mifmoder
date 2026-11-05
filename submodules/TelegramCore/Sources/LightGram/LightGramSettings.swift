@@ -31,6 +31,12 @@ public final class LightGramSettings {
         public static let activeFilterIndex = "lightgram_active_filter_index"
         public static let activeLogoTheme = "lightgram_active_logo_theme"
         public static let statsLastPeriod = "lightgram_stats_last_period"
+        
+        public static let nativeNotificationsEnabled = "lightgram_native_notifications_enabled"
+        public static let manualBadgeCount = "lightgram_manual_badge_count"
+        public static let customNotificationSound = "lightgram_custom_notification_sound"
+        public static let backgroundRefreshStatsEnabled = "lightgram_bg_refresh_stats_enabled"
+        public static let maxDiskCacheLimitGB = "lightgram_max_disk_cache_limit_gb"
     }
     
     public init() {
@@ -306,11 +312,59 @@ public final class LightGramSettings {
     
     public var activeLogoTheme: String {
         get {
-            return self.getString(forKey: Keys.activeLogoTheme, default: "AmberIcon")
+            return self.getString(forKey: Keys.activeLogoTheme, default: "PinkIcon")
         }
         set {
             self.setString(newValue, forKey: Keys.activeLogoTheme)
             NotificationCenter.default.post(name: NSNotification.Name("LightGramLogoChanged"), object: nil, userInfo: ["logo": newValue])
+        }
+    }
+    
+    // MARK: - Notifications & Cache Properties
+    public var nativeNotificationsEnabled: Bool {
+        get {
+            return self.getBool(forKey: Keys.nativeNotificationsEnabled, default: true)
+        }
+        set {
+            self.setBool(newValue, forKey: Keys.nativeNotificationsEnabled)
+            NotificationCenter.default.post(name: NSNotification.Name("LightGramNotificationsChanged"), object: nil, userInfo: ["enabled": newValue])
+        }
+    }
+    
+    public var manualBadgeCount: Int {
+        get {
+            return self.getInt(forKey: Keys.manualBadgeCount, default: 0)
+        }
+        set {
+            self.setInt(newValue, forKey: Keys.manualBadgeCount)
+            NotificationCenter.default.post(name: NSNotification.Name("LightGramBadgeChanged"), object: nil, userInfo: ["badge": newValue])
+        }
+    }
+    
+    public var customNotificationSound: String {
+        get {
+            return self.getString(forKey: Keys.customNotificationSound, default: "default")
+        }
+        set {
+            self.setString(newValue, forKey: Keys.customNotificationSound)
+        }
+    }
+    
+    public var backgroundRefreshStatsEnabled: Bool {
+        get {
+            return self.getBool(forKey: Keys.backgroundRefreshStatsEnabled, default: true)
+        }
+        set {
+            self.setBool(newValue, forKey: Keys.backgroundRefreshStatsEnabled)
+        }
+    }
+    
+    public var maxDiskCacheLimitGB: Int {
+        get {
+            return self.getInt(forKey: Keys.maxDiskCacheLimitGB, default: 5)
+        }
+        set {
+            self.setInt(newValue, forKey: Keys.maxDiskCacheLimitGB)
         }
     }
 }

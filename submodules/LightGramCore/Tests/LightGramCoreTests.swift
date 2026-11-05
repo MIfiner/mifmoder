@@ -289,18 +289,21 @@ final class LightGramCoreTests: XCTestCase {
     
     func testLogosAndLocalization() {
         // Test Logos count and attributes
-        XCTAssertEqual(LightGramLogosController.availableLogos.count, 4)
+        XCTAssertEqual(LightGramLogosController.availableLogos.count, 7)
         let ids = LightGramLogosController.availableLogos.map { $0.id }
+        XCTAssertTrue(ids.contains("PinkIcon"))
+        XCTAssertTrue(ids.contains("RedIcon"))
+        XCTAssertTrue(ids.contains("PurpleIcon"))
+        XCTAssertTrue(ids.contains("VioletIcon"))
         XCTAssertTrue(ids.contains("AmberIcon"))
         XCTAssertTrue(ids.contains("IceIcon"))
-        XCTAssertTrue(ids.contains("VioletIcon"))
         XCTAssertTrue(ids.contains("EmeraldIcon"))
         
         // Test active logo theme setting
         LightGramSettings.shared.activeLogoTheme = "EmeraldIcon"
         XCTAssertEqual(LightGramSettings.shared.activeLogoTheme, "EmeraldIcon")
-        LightGramSettings.shared.activeLogoTheme = "AmberIcon"
-        XCTAssertEqual(LightGramSettings.shared.activeLogoTheme, "AmberIcon")
+        LightGramSettings.shared.activeLogoTheme = "PinkIcon"
+        XCTAssertEqual(LightGramSettings.shared.activeLogoTheme, "PinkIcon")
         
         // Test Localization
         XCTAssertFalse(LightGramStrings.tr("GhostMode").isEmpty)
@@ -313,6 +316,15 @@ final class LightGramCoreTests: XCTestCase {
         XCTAssertFalse(LightGramStrings.tr("CircleStudio_Title").isEmpty)
         XCTAssertFalse(LightGramStrings.tr("MediaVault_SaveToVault").isEmpty)
         XCTAssertFalse(LightGramStrings.tr("MediaVault_ForwardNormal").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("MediaVault_SendAsCircle").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("save_action").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("forward_action").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("delete_action").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("settings_menu").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("stats_menu").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("vault_menu").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("Dashboard_OneTime").isEmpty)
+        XCTAssertFalse(LightGramStrings.tr("Dashboard_Delete").isEmpty)
     }
     
     func testMediaVaultOperations() {

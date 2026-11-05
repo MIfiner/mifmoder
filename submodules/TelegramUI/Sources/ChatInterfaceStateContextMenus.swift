@@ -1631,6 +1631,45 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                         f(.dismissWithoutContent)
                     })))
                 }
+                
+                // 4. LightGram: Send as Circle (convert VO video / video to Circle)
+                if isVideo {
+                    actions.append(.action(ContextMenuActionItem(text: LightGramStrings.tr("MediaVault_SendAsCircle"), icon: { theme in
+                        return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Play"), color: LightGramSettings.signatureYellowAccent)
+                    }, action: { _, f in
+                        if let file = targetMedia as? TelegramMediaFile {
+                            let cachedPath = context.engine.resources.completedResourcePath(id: EngineMediaResource.Id(file.resource.id.stringRepresentation))
+                            if let cachedPath = cachedPath, FileManager.default.fileExists(atPath: cachedPath) {
+                                LightGramVideoProcessor.convertVideoToCircle(sourceURL: URL(fileURLWithPath: cachedPath)) { exportedURL, duration, error in
+                                    DispatchQueue.main.async {
+                                        if let exportedURL = exportedURL {
+                                            LightGramMediaVaultManager.shared.saveDirectFile(
+                                                sourceURL: exportedURL,
+                                                fileName: "Circle_\(Int(Date().timeIntervalSince1970)).mp4",
+                                                mediaType: "circle",
+                                                chatTitle: message.peers[message.id.peerId]?.debugDisplayTitle ?? "Chat",
+                                                authorName: message.author?.debugDisplayTitle ?? "Unknown",
+                                                isOneTime: false,
+                                                duration: duration,
+                                                dimensions: "400x400"
+                                            ) { success, _ in
+                                                let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+                                                controllerInteraction.presentControllerInCurrent(UndoOverlayController(presentationData: presentationData, content: .mediaSaved(text: LightGramStrings.tr("CircleStudio_Success")), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return true }), nil)
+                                            }
+                                        } else {
+                                            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+                                            controllerInteraction.presentControllerInCurrent(UndoOverlayController(presentationData: presentationData, content: .mediaSaved(text: error ?? "Conversion failed"), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return true }), nil)
+                                        }
+                                    }
+                                }
+                            } else {
+                                let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+                                controllerInteraction.presentControllerInCurrent(UndoOverlayController(presentationData: presentationData, content: .mediaSaved(text: "Downloading video, retry in a moment"), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return true }), nil)
+                            }
+                        }
+                        f(.default)
+                    })))
+                }
             }
         }
         

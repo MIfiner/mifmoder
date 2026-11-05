@@ -81,6 +81,12 @@ public func fetchedMediaResource(
     preferBackgroundReferenceRevalidation: Bool = false,
     continueInBackground: Bool = false
 ) -> Signal<FetchResourceSourceType, FetchResourceError> {
+    // LightGram: Safeguard against downloading files exceeding 5GB limit to prevent out-of-memory crash
+    if let size = reference.resource.size, size > 5 * 1024 * 1024 * 1024 {
+        postboxLog("LightGram: Resource size \(size) exceeds 5GB cache safety limit")
+        NotificationCenter.default.post(name: NSNotification.Name("LightGramLargeFileWarning"), object: nil, userInfo: ["size": size])
+    }
+    
     var isRandomAccessAllowed = true
     switch reference {
     case let .media(media, _):

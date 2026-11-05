@@ -142,4 +142,31 @@
         <key>UIPrerenderedIcon</key>
         <true/>
     </dict>
+    <key>PinkIcon</key>
+    <dict>
+        <key>CFBundleIconFiles</key>
+        <array>
+            <string>PinkIcon</string>
+        </array>
+        <key>UIPrerenderedIcon</key>
+        <true/>
+    </dict>
+    <key>RedIcon</key>
+    <dict>
+        <key>CFBundleIconFiles</key>
+        <array>
+            <string>RedIcon</string>
+        </array>
+        <key>UIPrerenderedIcon</key>
+        <true/>
+    </dict>
+    <key>PurpleIcon</key>
+    <dict>
+        <key>CFBundleIconFiles</key>
+        <array>
+            <string>PurpleIcon</string>
+        </array>
+        <key>UIPrerenderedIcon</key>
+        <true/>
+    </dict>
 </dict>

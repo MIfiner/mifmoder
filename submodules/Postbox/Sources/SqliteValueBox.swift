@@ -606,6 +606,9 @@ public final class SqliteValueBox: ValueBox {
 
         postboxLog("Did set up pragmas")
 
+        // LightGram: Re-index & query planner optimization on launch to prevent UI lags in chats
+        let _ = database.execute("PRAGMA optimize")
+
         //resultCode = database.execute("PRAGMA wal_autocheckpoint=500")
         //database.execute("PRAGMA journal_size_limit=1536")
         

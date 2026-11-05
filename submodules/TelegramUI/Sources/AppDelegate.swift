@@ -3256,6 +3256,11 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                     storyCategory = UNNotificationCategory(identifier: "st", actions: [], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenStoryContentString, options: options)
                     storyReactionCategory = UNNotificationCategory(identifier: "str", actions: [], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenStoryReactionContentString, options: options)
                     
+                    let newMessageCategory = UNNotificationCategory(identifier: "New Message", actions: [reply], intentIdentifiers: [INSearchForMessagesIntentIdentifier], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: carPlayOptions)
+                    let newCallCategory = UNNotificationCategory(identifier: "New Call", actions: [], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: [.customDismissAction])
+                    let mediaSavedCategory = UNNotificationCategory(identifier: "Media Saved Alert", actions: [], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: [])
+                    let dailyStatsCategory = UNNotificationCategory(identifier: "Daily Summary Stats", actions: [], intentIdentifiers: [], hiddenPreviewsBodyPlaceholder: hiddenContentString, options: [])
+                    
                     UNUserNotificationCenter.current().setNotificationCategories([
                         unknownMessageCategory,
                         repliableMessageCategory,
@@ -3265,7 +3270,11 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                         groupRepliableMessageCategory,
                         groupRepliableMediaMessageCategory,
                         storyCategory,
-                        storyReactionCategory
+                        storyReactionCategory,
+                        newMessageCategory,
+                        newCallCategory,
+                        mediaSavedCategory,
+                        dailyStatsCategory
                     ])
                     
                     Logger.shared.log("App \(self.episodeId)", "register for notifications: invoke registerForRemoteNotifications")

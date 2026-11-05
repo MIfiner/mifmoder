@@ -343,6 +343,9 @@ alternate_icon_folders = [
     "IceIcon",
     "VioletIcon",
     "EmeraldIcon",
+    "PinkIcon",
+    "RedIcon",
+    "PurpleIcon",
 ]
 
 composer_icon_folders = []

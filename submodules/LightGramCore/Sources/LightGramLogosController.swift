@@ -10,6 +10,27 @@ import AppBundle
 import PresentationDataUtils
 import AlertUI
 
+public func loadAppIcon(_ name: String, bundlePath: String = getAppBundle().bundlePath) -> UIImage? {
+    let cleanName = (name as NSString).deletingPathExtension
+    let possiblePaths = [
+        bundlePath + "/\(name)",
+        bundlePath + "/\(cleanName).png",
+        bundlePath + "/\(cleanName).alticon/\(cleanName)@3x.png",
+        bundlePath + "/\(cleanName).alticon/\(cleanName)@2x.png",
+        bundlePath + "/\(cleanName).alticon/\(cleanName).png",
+        "/opt/lightgram/submodules/LightGramCore/Resources/Logos/\(name)",
+        "/opt/lightgram/submodules/LightGramCore/Resources/Logos/\(cleanName).png",
+        "/opt/lightgram/avatars/\(name)",
+        "/opt/lightgram/avatars/\(cleanName).png"
+    ]
+    for p in possiblePaths {
+        if let img = UIImage(contentsOfFile: p) {
+            return img
+        }
+    }
+    return UIImage(named: cleanName, in: getAppBundle(), compatibleWith: nil)
+}
+
 public struct LightGramLogoOption {
     public let id: String
     public let iconName: String
@@ -35,6 +56,38 @@ public final class LightGramLogosController: ViewController {
     
     public static let availableLogos: [LightGramLogoOption] = [
         LightGramLogoOption(
+            id: "PinkIcon",
+            iconName: "PinkIcon",
+            titleKey: "Logos_Pink",
+            descKey: "Logos_Pink_Desc",
+            accentColor: UIColor(rgb: 0xFF2D55),
+            imageFileName: "01-pink.png"
+        ),
+        LightGramLogoOption(
+            id: "RedIcon",
+            iconName: "RedIcon",
+            titleKey: "Logos_Red",
+            descKey: "Logos_Red_Desc",
+            accentColor: UIColor(rgb: 0xFF3B30),
+            imageFileName: "02-red.png"
+        ),
+        LightGramLogoOption(
+            id: "PurpleIcon",
+            iconName: "PurpleIcon",
+            titleKey: "Logos_Purple",
+            descKey: "Logos_Purple_Desc",
+            accentColor: UIColor(rgb: 0xAF52DE),
+            imageFileName: "03-purple.png"
+        ),
+        LightGramLogoOption(
+            id: "VioletIcon",
+            iconName: "VioletIcon",
+            titleKey: "Logos_Violet",
+            descKey: "Logos_Violet_Desc",
+            accentColor: UIColor(rgb: 0x5856D6),
+            imageFileName: "04-violet.png"
+        ),
+        LightGramLogoOption(
             id: "AmberIcon",
             iconName: "AmberIcon",
             titleKey: "Logos_Amber",
@@ -49,14 +102,6 @@ public final class LightGramLogosController: ViewController {
             descKey: "Logos_Ice_Desc",
             accentColor: UIColor(rgb: 0x00C7BE),
             imageFileName: "02_LightGram_Ice.png"
-        ),
-        LightGramLogoOption(
-            id: "VioletIcon",
-            iconName: "VioletIcon",
-            titleKey: "Logos_Violet",
-            descKey: "Logos_Violet_Desc",
-            accentColor: UIColor(rgb: 0xAF52DE),
-            imageFileName: "03_LightGram_Violet.png"
         ),
         LightGramLogoOption(
             id: "EmeraldIcon",
@@ -192,23 +237,9 @@ private final class LightGramLogoCardView: UIControl {
         self.iconImageView.contentMode = .scaleAspectFill
         
         // Load logo master asset
-        var loadedImage: UIImage? = nil
-        let bundlePath = getAppBundle().bundlePath
-        let possiblePaths = [
-            bundlePath + "/01_LightGram_Amber.png",
-            bundlePath + "/\(option.imageFileName)",
-            bundlePath + "/\(option.iconName).alticon/\(option.iconName)@3x.png",
-            bundlePath + "/\(option.iconName).alticon/\(option.iconName)@2x.png",
-            "/opt/lightgram/submodules/LightGramCore/Resources/Logos/\(option.imageFileName)"
-        ]
-        for p in possiblePaths {
-            if let img = UIImage(contentsOfFile: p) {
-                loadedImage = img
-                break
-            }
-        }
+        var loadedImage: UIImage? = loadAppIcon(option.imageFileName)
         if loadedImage == nil {
-            loadedImage = UIImage(named: option.iconName, in: getAppBundle(), compatibleWith: nil)
+            loadedImage = loadAppIcon(option.iconName)
         }
         self.iconImageView.image = loadedImage
         self.addSubview(self.iconImageView)

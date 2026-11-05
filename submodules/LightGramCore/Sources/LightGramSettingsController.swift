@@ -107,6 +107,7 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
     private enum Section: Int, CaseIterable {
         case ghostMode
         case spyMode
+        case notifications
         case privacyAndSecurity
         case smartFilters
         case tools
@@ -121,6 +122,7 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         switch s {
         case .ghostMode: return LightGramStrings.tr("GhostMode_Header")
         case .spyMode: return LightGramStrings.tr("SpyMode_Header")
+        case .notifications: return LightGramStrings.tr("notifications")
         case .privacyAndSecurity: return LightGramStrings.tr("PrivacyCenter_Header")
         case .smartFilters: return LightGramStrings.tr("SmartFolders_Header")
         case .tools: return LightGramStrings.tr("Settings")
@@ -144,6 +146,7 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         switch s {
         case .ghostMode: return 5
         case .spyMode: return 5
+        case .notifications: return 4
         case .privacyAndSecurity: return 2
         case .smartFilters: return 1
         case .tools: return 11
@@ -246,6 +249,27 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
             default: break
             }
             
+        case .notifications:
+            switch indexPath.row {
+            case 0:
+                cell.textLabel?.text = LightGramStrings.tr("notifications")
+                let sw = self.makeSwitch(isOn: LightGramSettings.shared.nativeNotificationsEnabled) { on in
+                    LightGramSettings.shared.nativeNotificationsEnabled = on
+                }
+                cell.accessoryView = sw
+            case 1:
+                cell.textLabel?.text = "APNs Categories"
+                cell.detailTextLabel?.text = "Message, Call, Vault, Stats"
+            case 2:
+                cell.textLabel?.text = "Badge Counter"
+                cell.detailTextLabel?.text = "\(LightGramSettings.shared.manualBadgeCount) (Tap to Reset)"
+                cell.accessoryType = .disclosureIndicator
+            case 3:
+                cell.textLabel?.text = "Cache Limit (iPhone 13 mini)"
+                cell.detailTextLabel?.text = "\(LightGramSettings.shared.maxDiskCacheLimitGB) GB"
+            default: break
+            }
+            
         case .smartFilters:
             cell.textLabel?.text = LightGramStrings.tr("SmartFolders_Header")
             let sw = self.makeSwitch(isOn: LightGramSettings.shared.smartFiltersEnabled) { on in
@@ -319,6 +343,10 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         if s == .spyMode && indexPath.row == 3 {
             let archiveVC = LightGramSpyArchiveController()
             self.push(archiveVC)
+        } else if s == .notifications && indexPath.row == 2 {
+            LightGramSettings.shared.manualBadgeCount = 0
+            LightGramDesignSystem.Haptics.impact(.medium)
+            self.tableView.reloadData()
         } else if s == .tools {
             switch indexPath.row {
             case 0:

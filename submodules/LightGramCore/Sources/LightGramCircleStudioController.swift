@@ -237,65 +237,10 @@ public final class LightGramCircleStudioController: ViewController, UIImagePicke
         self.convertButton.isEnabled = false
         self.statusLabel.text = LightGramStrings.tr("CircleStudio_Processing")
         
-        let asset = AVAsset(url: url)
-        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
-            self.finishProcessing(success: false, message: "No video track found")
-            return
-        }
-        
-        let duration = min(CMTimeGetSeconds(asset.duration), 60.0)
-        let timeRange = CMTimeRange(start: .zero, duration: CMTime(seconds: duration, preferredTimescale: 600))
-        
-        let naturalSize = videoTrack.naturalSize.applying(videoTrack.preferredTransform)
-        let cropSide = min(abs(naturalSize.width), abs(naturalSize.height))
-        let targetSize = CGSize(width: cropSide, height: cropSide)
-        
-        let composition = AVMutableComposition()
-        guard let compTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-            self.finishProcessing(success: false, message: "Export composition error")
-            return
-        }
-        
-        try? compTrack.insertTimeRange(timeRange, of: videoTrack, at: .zero)
-        
-        // Add Audio track if available
-        if let audioTrack = asset.tracks(withMediaType: .audio).first,
-           let compAudio = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
-            try? compAudio.insertTimeRange(timeRange, of: audioTrack, at: .zero)
-        }
-        
-        let videoComposition = AVMutableVideoComposition()
-        videoComposition.renderSize = targetSize
-        videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
-        
-        let instruction = AVMutableVideoCompositionInstruction()
-        instruction.timeRange = timeRange
-        
-        let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compTrack)
-        let tx = (cropSide - abs(naturalSize.width)) / 2.0
-        let ty = (cropSide - abs(naturalSize.height)) / 2.0
-        let transform = videoTrack.preferredTransform.concatenating(CGAffineTransform(translationX: tx, y: ty))
-        layerInstruction.setTransform(transform, at: .zero)
-        
-        instruction.layerInstructions = [layerInstruction]
-        videoComposition.instructions = [instruction]
-        
-        let tempExportURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("circle_\(UUID().uuidString).mp4")
-        try? FileManager.default.removeItem(at: tempExportURL)
-        
-        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
-            self.finishProcessing(success: false, message: "Export session failed")
-            return
-        }
-        
-        exportSession.outputURL = tempExportURL
-        exportSession.outputFileType = .mp4
-        exportSession.videoComposition = videoComposition
-        exportSession.timeRange = timeRange
-        
-        exportSession.exportAsynchronously { [weak self] in
+        LightGramVideoProcessor.convertVideoToCircle(sourceURL: url) { [weak self] exportedURL, duration, error in
             DispatchQueue.main.async {
-                if exportSession.status == .completed {
+                guard let strongSelf = self else { return }
+                if let tempExportURL = exportedURL {
                     LightGramMediaVaultManager.shared.saveDirectFile(
                         sourceURL: tempExportURL,
                         fileName: "Circle_\(Int(Date().timeIntervalSince1970)).mp4",
@@ -304,13 +249,13 @@ public final class LightGramCircleStudioController: ViewController, UIImagePicke
                         authorName: "Self",
                         isOneTime: false,
                         duration: duration,
-                        dimensions: "\(Int(cropSide))x\(Int(cropSide))"
+                        dimensions: "400x400"
                     ) { success, _ in
-                        self?.finishProcessing(success: success, message: LightGramStrings.tr("CircleStudio_Success"))
-                        self?.loadSavedCircles()
+                        strongSelf.finishProcessing(success: success, message: LightGramStrings.tr("CircleStudio_Success"))
+                        strongSelf.loadSavedCircles()
                     }
                 } else {
-                    self?.finishProcessing(success: false, message: exportSession.error?.localizedDescription ?? "Crop failed")
+                    strongSelf.finishProcessing(success: false, message: error ?? "Crop failed")
                 }
             }
         }

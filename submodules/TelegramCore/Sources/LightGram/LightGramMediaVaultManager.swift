@@ -4,6 +4,7 @@ import Photos
 import LocalAuthentication
 import SwiftSignalKit
 import Postbox
+import CommonCrypto
 
 public struct MediaVaultItem: Codable, Equatable {
     public let id: String
@@ -22,6 +23,7 @@ public struct MediaVaultItem: Codable, Equatable {
     public let mimeType: String
     public let duration: Double?
     public let dimensions: String?
+    public var fileHash: String?
     
     public init(
         id: String = UUID().uuidString,
@@ -39,7 +41,8 @@ public struct MediaVaultItem: Codable, Equatable {
         isOneTime: Bool = false,
         mimeType: String = "",
         duration: Double? = nil,
-        dimensions: String? = nil
+        dimensions: String? = nil,
+        fileHash: String? = nil
     ) {
         self.id = id
         self.peerId = peerId
@@ -57,6 +60,7 @@ public struct MediaVaultItem: Codable, Equatable {
         self.mimeType = mimeType
         self.duration = duration
         self.dimensions = dimensions
+        self.fileHash = fileHash
     }
 }
 
@@ -248,6 +252,41 @@ public final class LightGramMediaVaultManager {
         }
     }
     
+    private func computeFileHash(url: URL) -> String {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return "" }
+        defer { try? handle.close() }
+        var context = CC_SHA256_CTX()
+        CC_SHA256_Init(&context)
+        while autoreleasepool(invoking: {
+            let data = handle.readData(ofLength: 64 * 1024)
+            if data.isEmpty { return false }
+            data.withUnsafeBytes { buffer in
+                _ = CC_SHA256_Update(&context, buffer.baseAddress, CC_LONG(buffer.count))
+            }
+            return true
+        }) {}
+        var digest = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+        CC_SHA256_Final(&digest, &context)
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+    
+    public func cleanupTemporaryCache() {
+        let tmpURL = URL(fileURLWithPath: NSTemporaryDirectory())
+        let fileManager = FileManager.default
+        guard let files = try? fileManager.contentsOfDirectory(at: tmpURL, includingPropertiesForKeys: [.contentModificationDateKey], options: .skipsHiddenFiles) else { return }
+        let cutoff = Date().addingTimeInterval(-180)
+        for file in files {
+            let name = file.lastPathComponent
+            if name.hasPrefix("circle_") || name.hasPrefix("vo_") || name.hasPrefix("vault_") || name.hasPrefix("export_") {
+                if let attrs = try? fileManager.attributesOfItem(atPath: file.path),
+                   let modDate = attrs[.modificationDate] as? Date,
+                   modDate < cutoff {
+                    try? fileManager.removeItem(at: file)
+                }
+            }
+        }
+    }
+    
     private func copyAndStoreItem(
         sourcePath: String,
         peerId: Int64,
@@ -271,6 +310,18 @@ public final class LightGramMediaVaultManager {
         let destURL = self.itemsDirectory.appendingPathComponent(destFileName)
         
         do {
+            let hash = self.computeFileHash(url: URL(fileURLWithPath: sourcePath))
+            if !hash.isEmpty {
+                self.lock.lock()
+                let alreadyExists = self.itemsCache.contains { $0.fileHash == hash }
+                self.lock.unlock()
+                if alreadyExists {
+                    self.cleanupTemporaryCache()
+                    DispatchQueue.main.async { completion(true, "Already in Media Vault") }
+                    return
+                }
+            }
+            
             try fileManager.copyItem(at: URL(fileURLWithPath: sourcePath), to: destURL)
             let attrs = try fileManager.attributesOfItem(atPath: destURL.path)
             let fileSize = (attrs[.size] as? Int64) ?? 0
@@ -291,7 +342,8 @@ public final class LightGramMediaVaultManager {
                 isOneTime: isOneTime,
                 mimeType: mimeType,
                 duration: duration,
-                dimensions: dimensions
+                dimensions: dimensions,
+                fileHash: hash
             )
             
             self.lock.lock()
@@ -299,10 +351,12 @@ public final class LightGramMediaVaultManager {
             self.saveManifestLocked()
             self.lock.unlock()
             
+            self.cleanupTemporaryCache()
             DispatchQueue.main.async {
                 completion(true, nil)
             }
         } catch {
+            self.cleanupTemporaryCache()
             DispatchQueue.main.async {
                 completion(false, error.localizedDescription)
             }
@@ -331,6 +385,18 @@ public final class LightGramMediaVaultManager {
             let destURL = self.itemsDirectory.appendingPathComponent(destFileName)
             
             do {
+                let hash = self.computeFileHash(url: sourceURL)
+                if !hash.isEmpty {
+                    self.lock.lock()
+                    let alreadyExists = self.itemsCache.contains { $0.fileHash == hash }
+                    self.lock.unlock()
+                    if alreadyExists {
+                        self.cleanupTemporaryCache()
+                        DispatchQueue.main.async { completion(true, "Already in Media Vault") }
+                        return
+                    }
+                }
+                
                 if fileManager.fileExists(atPath: destURL.path) {
                     try? fileManager.removeItem(at: destURL)
                 }
@@ -354,7 +420,8 @@ public final class LightGramMediaVaultManager {
                     isOneTime: isOneTime,
                     mimeType: mediaType == "circle" || mediaType == "video" ? "video/mp4" : "application/octet-stream",
                     duration: duration,
-                    dimensions: dimensions
+                    dimensions: dimensions,
+                    fileHash: hash
                 )
                 
                 self.lock.lock()
@@ -362,10 +429,12 @@ public final class LightGramMediaVaultManager {
                 self.saveManifestLocked()
                 self.lock.unlock()
                 
+                self.cleanupTemporaryCache()
                 DispatchQueue.main.async {
                     completion(true, nil)
                 }
             } catch {
+                self.cleanupTemporaryCache()
                 DispatchQueue.main.async {
                     completion(false, error.localizedDescription)
                 }

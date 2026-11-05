@@ -29,6 +29,7 @@ public final class LightGramMediaVaultController: ViewController, UICollectionVi
     
     private let filterOptions: [(key: String, titleKey: String)] = [
         ("all", "MediaVault_All"),
+        ("onetime", "Dashboard_OneTime"),
         ("photo", "MediaVault_Photos"),
         ("video", "MediaVault_Videos"),
         ("circle", "MediaVault_Circles"),
@@ -37,9 +38,10 @@ public final class LightGramMediaVaultController: ViewController, UICollectionVi
         ("favorites", "MediaVault_Favorites")
     ]
     
-    public init(context: AccountContext) {
+    public init(context: AccountContext, initialFilter: String = "all") {
         self.context = context
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
+        self.selectedFilter = initialFilter
         
         super.init(navigationBarPresentationData: NavigationBarPresentationData(presentationData: self.presentationData))
         
@@ -207,12 +209,17 @@ public final class LightGramMediaVaultController: ViewController, UICollectionVi
     
     private func loadItems() {
         let favs = self.selectedFilter == "favorites"
-        let type = favs ? nil : (self.selectedFilter == "all" ? nil : self.selectedFilter)
-        self.items = LightGramMediaVaultManager.shared.getItems(
+        let onetime = self.selectedFilter == "onetime"
+        let type = (favs || onetime) ? nil : (self.selectedFilter == "all" ? nil : self.selectedFilter)
+        var fetched = LightGramMediaVaultManager.shared.getItems(
             typeFilter: type,
             searchQuery: self.searchQuery,
             favoritesOnly: favs
         )
+        if onetime {
+            fetched = fetched.filter { $0.isOneTime }
+        }
+        self.items = fetched
         self.emptyLabel.isHidden = !self.items.isEmpty
         self.storageSizeLabel.text = "\(LightGramStrings.tr("MediaVault_StorageUsed")): \(LightGramMediaVaultManager.shared.formattedStorageSize()) (\(self.items.count))"
         self.collectionView.reloadData()

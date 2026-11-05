@@ -260,6 +260,7 @@ jobs:
 
           echo "Found IPA at: $IPA_SRC"
           cp "$IPA_SRC" build/artifacts/LightGram-V1.ipa
+          cp "$IPA_SRC" build/artifacts/lightgram-v1-build-142.ipa
 
           # Locate and zip DSYMs if not already packaged
           if [ ! -f "build/artifacts/Telegram.DSYMs.zip" ]; then
@@ -284,8 +285,10 @@ jobs:
       - name: Upload IPA as GitHub Actions Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LightGram-V1-iOS-${{ env.BUILD_NUMBER }}
-          path: build/artifacts/LightGram-V1.ipa
+          name: lightgram-v1-build-142
+          path: |
+            build/artifacts/lightgram-v1-build-142.ipa
+            build/artifacts/LightGram-V1.ipa
           if-no-files-found: error
           retention-days: 14
 
@@ -304,22 +307,25 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.APP_VERSION }}-b${{ env.BUILD_NUMBER }}
-          name: LightGram V1 (${{ env.APP_VERSION }}.${{ env.BUILD_NUMBER }})
+          name: LightGram V2.0 Personal Edition (${{ env.APP_VERSION }}.${{ env.BUILD_NUMBER }})
           body: |
-            ### LightGram V1 for iOS
+            ### LightGram V2.0 Personal Edition for iOS (iPhone 13 mini)
+            **Build Artifact:** `lightgram-v1-build-142.ipa`
             **Version:** ${{ env.APP_VERSION }} (Build ${{ env.BUILD_NUMBER }})
             **Bundle ID:** `site.lightgram.ios`
             
-            #### Features:
-            - **Signature Dark & Yellow Aesthetic:** Deep graphite/OLED black design with elegant golden-yellow accents.
-            - **Ghost Mode:** Suppress message read receipts, typing indicators, and stealth story viewing.
-            - **Spy Mode:** Local audit archive for deleted messages and message edit revision history.
-            - **Smart Filters:** Convenient quick tabs for direct chats, groups, channels, bots, and unread messages.
-            - **Telegram Core:** Full MTProto support, authentic Telegram login, group chats, channels, calls, secret chats, and stickers.
+            #### Highlights & Modules:
+            - **One-Time Media Vault:** Save View Once photos, videos, and video circles to camera roll, encrypted Media Vault with Face ID, forward as regular media, and convert to square 1:1 circular video notes.
+            - **Native Push Notifications:** Complete APNs entitlements, dynamic sandbox detection, notification categories (`New Message`, `New Call`, `Media Saved Alert`, `Daily Summary Stats`), manual badge counter, and background fetch.
+            - **Stability & Performance:** Message history pagination (50–100 chunks) eliminating chat entry crashes, 5 GB cache safeguard, startup SQLite re-indexing & query optimization, and temporary cache cleanup.
+            - **Avatars & Theme System:** 4 custom themes (Pink, Red Warning, Purple VIP, Violet Dark Mode) with alternate app icon switching.
+            - **Russian Localization:** Full Russian translation for menus (`save_action`, `forward_action`, `delete_action`, `settings_menu`, `stats_menu`, `vault_menu`) and submenus.
+            - **Simplified AMOLED UX:** 6-tile grid dashboard with 300ms interactive animations and pure true-black contrast.
             
             #### Installation:
-            Install `LightGram-V1.ipa` via **TrollStore**, **AltStore**, **Sideloadly**, **LiveContainer**, or **Scarlet**.
+            Install `lightgram-v1-build-142.ipa` via **Sideloadly**, **AltStore**, **TrollStore**, **LiveContainer**, or **Scarlet**.
           files: |
+            build/artifacts/lightgram-v1-build-142.ipa
             build/artifacts/LightGram-V1.ipa
             build/artifacts/LightGram-V1.DSYMs.zip
         env:
