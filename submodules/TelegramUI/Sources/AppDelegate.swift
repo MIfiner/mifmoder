@@ -1723,8 +1723,6 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             })
         }
         
-        application.setMinimumBackgroundFetchInterval(UIApplication.backgroundFetchIntervalMinimum)
-        
         let timestamp = Int(CFAbsoluteTimeGetCurrent())
         let minReindexTimestamp = timestamp - 2 * 24 * 60 * 60
         if let indexTimestamp = UserDefaults.standard.object(forKey: "TelegramCacheIndexTimestamp_v2") as? NSNumber, indexTimestamp.intValue >= minReindexTimestamp {
