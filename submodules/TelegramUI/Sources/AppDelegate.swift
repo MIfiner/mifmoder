@@ -363,6 +363,23 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         testIsLaunched = true
         CrashReportCollector.shared.start()
         
+        NSSetUncaughtExceptionHandler { exception in
+            let callStack = exception.callStackSymbols.joined(separator: "\n")
+            let report = """
+            [LightGram Crash Exception]
+            Name: \(exception.name.rawValue)
+            Reason: \(exception.reason ?? "Unknown")
+            UserInfo: \(String(describing: exception.userInfo))
+            CallStack:
+            \(callStack)
+            """
+            NSLog("%@", report)
+            if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                let file = documents.appendingPathComponent("lightgram_last_crash.txt")
+                try? report.write(to: file, atomically: true, encoding: .utf8)
+            }
+        }
+        
         let _ = voipTokenPromise.get().start(next: { token in
             self.voipDeviceToken.set(.single(token))
         })

@@ -53,7 +53,7 @@ extension PeerInfoScreenNode {
         }
         switch section {
         case .lightGram:
-            push(LightGramControlCenterController(context: self.context))
+            push(lightGramControlCenterController(context: self.context))
         case .avatar:
             self.controller?.openAvatarForEditing()
         case .edit:

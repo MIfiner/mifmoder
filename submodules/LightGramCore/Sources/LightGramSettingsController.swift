@@ -149,7 +149,9 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
     }
     
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
-        let args = arguments as! LightGramSettingsArguments
+        guard let args = arguments as? LightGramSettingsArguments else {
+            return ItemListTextItem(presentationData: presentationData, text: .plain(""), sectionId: self.section)
+        }
         
         switch self {
         case .ghostHeader:
@@ -346,7 +348,7 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
                 sectionId: self.section,
                 style: .blocks,
                 action: {
-                    args.push(LightGramControlCenterController(context: args.context))
+                    args.push(lightGramControlCenterController(context: args.context))
                 }
             )
         case .logosAndThemes:
@@ -412,85 +414,87 @@ private func lightGramSettingsEntries(state: LightGramSettingsState) -> [LightGr
     return entries
 }
 
-// MARK: - Controller Class
-public final class LightGramSettingsController: ItemListController {
-    public init(context: AccountContext? = nil) {
-        var pushImpl: ((ViewController) -> Void)?
-        var presentImpl: ((ViewController) -> Void)?
-        
-        let stateValue = Atomic(value: LightGramSettingsState())
-        let statePromise = ValuePromise<LightGramSettingsState>(stateValue.with { $0 }, ignoreRepeated: true)
-        
-        let updateState: ((inout LightGramSettingsState) -> Void) -> Void = { f in
-            let updated = stateValue.modify { current in
-                var mod = current
-                f(&mod)
-                return mod
-            }
-            statePromise.set(updated)
+// MARK: - Factory Function & Controller
+public func lightGramSettingsController(context: AccountContext? = nil) -> ViewController {
+    var pushImpl: ((ViewController) -> Void)?
+    var presentImpl: ((ViewController) -> Void)?
+    
+    let stateValue = Atomic(value: LightGramSettingsState())
+    let statePromise = ValuePromise<LightGramSettingsState>(stateValue.with { $0 }, ignoreRepeated: true)
+    
+    let updateState: ((inout LightGramSettingsState) -> Void) -> Void = { f in
+        let updated = stateValue.modify { current in
+            var mod = current
+            f(&mod)
+            return mod
         }
-        
-        let arguments = LightGramSettingsArguments(
-            context: context,
-            push: { c in pushImpl?(c) },
-            present: { c in presentImpl?(c) },
-            updateState: updateState
-        )
-        
-        let presentationData: ItemListPresentationData
-        let updatedPresentationData: Signal<ItemListPresentationData, NoError>
-        
-        if let context = context {
-            let pd = context.sharedContext.currentPresentationData.with { $0 }
-            presentationData = ItemListPresentationData(pd)
-            updatedPresentationData = context.sharedContext.presentationData |> map(ItemListPresentationData.init(_:))
-        } else {
-            let pd = defaultPresentationData()
-            presentationData = ItemListPresentationData(pd)
-            updatedPresentationData = .single(presentationData)
-        }
-        
-        let stateSignal: Signal<(ItemListControllerState, (ItemListNodeState, Any)), NoError> = combineLatest(
-            queue: .mainQueue(),
-            updatedPresentationData,
-            statePromise.get()
-        )
-        |> deliverOnMainQueue
-        |> map { pData, state -> (ItemListControllerState, (ItemListNodeState, Any)) in
-            let controllerState = ItemListControllerState(
-                presentationData: pData,
-                title: .text(LightGramStrings.tr("Settings")),
-                leftNavigationButton: nil,
-                rightNavigationButton: nil,
-                backNavigationButton: ItemListBackButton(title: pData.strings.Common_Back),
-                animateChanges: true
-            )
-            let listState = ItemListNodeState(
-                presentationData: pData,
-                entries: lightGramSettingsEntries(state: state),
-                style: .blocks,
-                animateChanges: true
-            )
-            return (controllerState, (listState, arguments))
-        }
-        
-        super.init(
-            presentationData: presentationData,
-            updatedPresentationData: updatedPresentationData,
-            state: stateSignal,
-            tabBarItem: nil,
-            hideNavigationBarBackground: false
-        )
-        
-        pushImpl = { [weak self] c in
-            (self?.navigationController as? NavigationController)?.pushViewController(c)
-        }
-        presentImpl = { [weak self] c in
-            self?.present(c, in: .window(.root))
-        }
+        statePromise.set(updated)
     }
     
-    required public init(coder aDecoder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
+    let arguments = LightGramSettingsArguments(
+        context: context,
+        push: { c in pushImpl?(c) },
+        present: { c in presentImpl?(c) },
+        updateState: updateState
+    )
+    
+    let presentationData: ItemListPresentationData
+    let updatedPresentationData: Signal<ItemListPresentationData, NoError>
+    
+    if let context = context {
+        let pd = context.sharedContext.currentPresentationData.with { $0 }
+        presentationData = ItemListPresentationData(pd)
+        updatedPresentationData = context.sharedContext.presentationData |> map(ItemListPresentationData.init(_:))
+    } else {
+        let pd = defaultPresentationData()
+        presentationData = ItemListPresentationData(pd)
+        updatedPresentationData = .single(presentationData)
     }
+    
+    let signal: Signal<(ItemListControllerState, (ItemListNodeState, Any)), NoError> = combineLatest(
+        queue: .mainQueue(),
+        updatedPresentationData,
+        statePromise.get()
+    )
+    |> map { pData, state -> (ItemListControllerState, (ItemListNodeState, Any)) in
+        let controllerState = ItemListControllerState(
+            presentationData: pData,
+            title: .text(LightGramStrings.tr("Settings")),
+            leftNavigationButton: nil,
+            rightNavigationButton: nil,
+            backNavigationButton: ItemListBackButton(title: pData.strings.Common_Back),
+            animateChanges: true
+        )
+        let listState = ItemListNodeState(
+            presentationData: pData,
+            entries: lightGramSettingsEntries(state: state),
+            style: .blocks,
+            animateChanges: true
+        )
+        return (controllerState, (listState, arguments))
+    }
+    
+    let controller: ItemListController
+    if let context = context {
+        controller = ItemListController(context: context, state: signal)
+    } else {
+        controller = ItemListController(
+            presentationData: presentationData,
+            updatedPresentationData: updatedPresentationData,
+            state: signal,
+            tabBarItem: nil
+        )
+    }
+    
+    pushImpl = { [weak controller] c in
+        (controller?.navigationController as? NavigationController)?.pushViewController(c)
+    }
+    presentImpl = { [weak controller] c in
+        controller?.present(c, in: .window(.root))
+    }
+    return controller
+}
+
+public func LightGramSettingsController(context: AccountContext? = nil) -> ViewController {
+    return lightGramSettingsController(context: context)
 }

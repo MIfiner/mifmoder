@@ -434,7 +434,7 @@ final class LightGramCoreTests: XCTestCase {
     }
     
     func testControlCenterControllerLifecycle() {
-        let controller = LightGramControlCenterController()
+        let controller = lightGramControlCenterController()
         XCTAssertNotNil(controller.displayNode)
         XCTAssertNotNil(controller.view)
         
@@ -452,7 +452,7 @@ final class LightGramCoreTests: XCTestCase {
     }
     
     func testSettingsControllerLifecycle() {
-        let controller = LightGramSettingsController()
+        let controller = lightGramSettingsController()
         XCTAssertNotNil(controller.displayNode)
         XCTAssertNotNil(controller.view)
         
