@@ -374,6 +374,8 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             \(callStack)
             """
             NSLog("%@", report)
+            LightGramDiagnostics.shared.log("CRITICAL_UNCAUGHT_EXCEPTION: \(exception.name.rawValue) reason: \(exception.reason ?? "none")")
+            LightGramDiagnostics.shared.recordStage("CRASH_EXCEPTION_\(exception.name.rawValue)")
             if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
                 let file = documents.appendingPathComponent("lightgram_last_crash.txt")
                 try? report.write(to: file, atomically: true, encoding: .utf8)
@@ -1845,6 +1847,38 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                 }))
             }
         })
+        
+        if LightGramDiagnostics.shared.didCrashDuringSettingsOpen() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                guard let strongSelf = self, let rootVC = strongSelf.window?.rootViewController else { return }
+                let alert = UIAlertController(
+                    title: "LightGram: Обнаружен сбой",
+                    message: "При предыдущей попытке открыть меню LightGram произошёл сбой. Хотите отправить диагностический лог разработчику?",
+                    preferredStyle: .alert
+                )
+                alert.addAction(UIAlertAction(title: "Поделиться логом (Share)", style: .default, handler: { _ in
+                    LightGramDiagnostics.shared.clearCrashMarker()
+                    let files = LightGramDiagnostics.shared.getAllLogFiles()
+                    let summary = LightGramDiagnostics.shared.fullDiagnosticSummary()
+                    var activityItems: [Any] = files
+                    if let summaryData = summary.data(using: .utf8) {
+                        let tempURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("lightgram_diagnostic_summary.txt")
+                        try? summaryData.write(to: tempURL)
+                        activityItems.insert(tempURL, at: 0)
+                    }
+                    let shareSheet = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+                    if let popover = shareSheet.popoverPresentationController {
+                        popover.sourceView = rootVC.view
+                        popover.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
+                    }
+                    rootVC.present(shareSheet, animated: true, completion: nil)
+                }))
+                alert.addAction(UIAlertAction(title: "Закрыть", style: .cancel, handler: { _ in
+                    LightGramDiagnostics.shared.clearCrashMarker()
+                }))
+                rootVC.present(alert, animated: true, completion: nil)
+            }
+        }
                 
         return true
     }

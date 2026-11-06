@@ -149,6 +149,11 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
     }
     
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
+        LightGramDiagnostics.shared.log("SETTINGS_RENDER_ITEM_BEGIN: \(self) [id=\(self.stableId)]")
+        LightGramDiagnostics.shared.recordStage("SETTINGS_RENDER_ITEM_\(self.stableId)")
+        defer {
+            LightGramDiagnostics.shared.log("SETTINGS_RENDER_ITEM_END: \(self) [id=\(self.stableId)]")
+        }
         guard let args = arguments as? LightGramSettingsArguments else {
             return ItemListTextItem(presentationData: presentationData, text: .plain(""), sectionId: self.section)
         }

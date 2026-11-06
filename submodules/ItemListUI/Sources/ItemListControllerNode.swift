@@ -53,6 +53,8 @@ private struct ItemListNodeEntryTransition {
 }
 
 private func preparedItemListNodeEntryTransition(from fromEntries: [ItemListNodeAnyEntry], to toEntries: [ItemListNodeAnyEntry], presentationData: ItemListPresentationData, arguments: Any, presentationDataUpdated: Bool) -> ItemListNodeEntryTransition {
+    LightGramDiagnostics.shared.log("ITEM_LIST_NODE: preparedTransition from=\(fromEntries.count) to=\(toEntries.count)")
+    LightGramDiagnostics.shared.recordStage("ITEM_LIST_NODE_MERGE_BEGIN")
     let (deleteIndices, indicesAndItems, updateIndices) = mergeListsStableWithUpdates(leftList: fromEntries, rightList: toEntries, isLess: { lhs, rhs in
         return lhs.isLessThan(rhs)
     }, isEqual: { lhs, rhs in
@@ -60,10 +62,22 @@ private func preparedItemListNodeEntryTransition(from fromEntries: [ItemListNode
     }, getId: { value in
         return value.anyId
     }, allUpdated: presentationDataUpdated)
+    LightGramDiagnostics.shared.log("ITEM_LIST_NODE: mergeListsStableWithUpdates returned dels=\(deleteIndices.count) ins=\(indicesAndItems.count) upds=\(updateIndices.count)")
+    LightGramDiagnostics.shared.recordStage("ITEM_LIST_NODE_MERGE_DONE")
     
     let deletions = deleteIndices.map { ListViewDeleteItem(index: $0, directionHint: nil) }
-    let insertions = indicesAndItems.map { ListViewInsertItem(index: $0.0, previousIndex: $0.2, item: $0.1.item(presentationData: presentationData, arguments: arguments), directionHint: nil) }
-    let updates = updateIndices.map { ListViewUpdateItem(index: $0.0, previousIndex: $0.2, item: $0.1.item(presentationData: presentationData, arguments: arguments), directionHint: nil) }
+    let insertions = indicesAndItems.map { itemTuple -> ListViewInsertItem in
+        LightGramDiagnostics.shared.log("ITEM_LIST_NODE: Generating insert item at index \(itemTuple.0)")
+        let item = itemTuple.1.item(presentationData: presentationData, arguments: arguments)
+        return ListViewInsertItem(index: itemTuple.0, previousIndex: itemTuple.2, item: item, directionHint: nil)
+    }
+    let updates = updateIndices.map { itemTuple -> ListViewUpdateItem in
+        LightGramDiagnostics.shared.log("ITEM_LIST_NODE: Generating update item at index \(itemTuple.0)")
+        let item = itemTuple.1.item(presentationData: presentationData, arguments: arguments)
+        return ListViewUpdateItem(index: itemTuple.0, previousIndex: itemTuple.2, item: item, directionHint: nil)
+    }
+    LightGramDiagnostics.shared.log("ITEM_LIST_NODE: preparedTransition completed")
+    LightGramDiagnostics.shared.recordStage("ITEM_LIST_NODE_TRANSITION_READY")
     
     return ItemListNodeEntryTransition(deletions: deletions, insertions: insertions, updates: updates)
 }

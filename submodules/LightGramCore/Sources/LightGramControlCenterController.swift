@@ -190,6 +190,11 @@ private enum LightGramEntry: ItemListNodeEntry {
     }
     
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
+        LightGramDiagnostics.shared.log("RENDER_ITEM_BEGIN: \(self) [id=\(self.stableId)]")
+        LightGramDiagnostics.shared.recordStage("RENDER_ITEM_\(self.stableId)")
+        defer {
+            LightGramDiagnostics.shared.log("RENDER_ITEM_END: \(self) [id=\(self.stableId)]")
+        }
         guard let args = arguments as? LightGramControlCenterArguments else {
             return ItemListTextItem(presentationData: presentationData, text: .plain(""), sectionId: self.section)
         }
@@ -582,12 +587,21 @@ private enum LightGramEntry: ItemListNodeEntry {
         case .diagnostics:
             return ItemListDisclosureItem(
                 presentationData: presentationData,
-                title: "📶  Network Diagnostics",
-                label: "DC Ping RTT",
+                title: "📶  Diagnostics & Crash Logs",
+                label: "Share Log",
                 sectionId: self.section,
                 style: .blocks,
                 action: {
-                    args.push(LightGramNetworkDiagnosticsController())
+                    let files = LightGramDiagnostics.shared.getAllLogFiles()
+                    let summary = LightGramDiagnostics.shared.fullDiagnosticSummary()
+                    var activityItems: [Any] = files
+                    if let summaryData = summary.data(using: .utf8) {
+                        let tempURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("lightgram_diagnostic_summary.txt")
+                        try? summaryData.write(to: tempURL)
+                        activityItems.insert(tempURL, at: 0)
+                    }
+                    let activity = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+                    args.present(activity)
                 }
             )
         case .advancedFooter:
@@ -660,11 +674,17 @@ private func lightGramControlCenterEntries(state: LightGramControlCenterState) -
 
 // MARK: - Factory Function & Controller
 public func lightGramControlCenterController(context: AccountContext? = nil) -> ViewController {
+    LightGramDiagnostics.shared.log("CONTROL_CENTER: Factory function lightGramControlCenterController entered (context: \(context != nil))")
+    LightGramDiagnostics.shared.recordStage("CONTROL_CENTER_FACTORY_ENTERED")
+    
     var pushImpl: ((ViewController) -> Void)?
     var presentImpl: ((ViewController) -> Void)?
     
+    LightGramDiagnostics.shared.log("CONTROL_CENTER: Initializing LightGramControlCenterState")
     let stateValue = Atomic(value: LightGramControlCenterState())
     let statePromise = ValuePromise<LightGramControlCenterState>(stateValue.with { $0 }, ignoreRepeated: true)
+    LightGramDiagnostics.shared.log("CONTROL_CENTER: StatePromise initialized")
+    LightGramDiagnostics.shared.recordStage("CONTROL_CENTER_STATE_PROMISE_READY")
     
     let updateState: ((inout LightGramControlCenterState) -> Void) -> Void = { f in
         let updated = stateValue.modify { current in
@@ -694,6 +714,8 @@ public func lightGramControlCenterController(context: AccountContext? = nil) -> 
         presentationData = ItemListPresentationData(pd)
         updatedPresentationData = .single(presentationData)
     }
+    LightGramDiagnostics.shared.log("CONTROL_CENTER: PresentationData initialized")
+    LightGramDiagnostics.shared.recordStage("CONTROL_CENTER_PRESENTATION_DATA_READY")
     
     let signal: Signal<(ItemListControllerState, (ItemListNodeState, Any)), NoError> = combineLatest(
         queue: .mainQueue(),
@@ -701,6 +723,9 @@ public func lightGramControlCenterController(context: AccountContext? = nil) -> 
         statePromise.get()
     )
     |> map { pData, state -> (ItemListControllerState, (ItemListNodeState, Any)) in
+        LightGramDiagnostics.shared.log("CONTROL_CENTER_SIGNAL: combineLatest map closure executed")
+        LightGramDiagnostics.shared.recordStage("CONTROL_CENTER_COMBINELATEST_MAP")
+        
         let controllerState = ItemListControllerState(
             presentationData: pData,
             title: .text(LightGramStrings.tr("LightGram")),
@@ -709,15 +734,23 @@ public func lightGramControlCenterController(context: AccountContext? = nil) -> 
             backNavigationButton: ItemListBackButton(title: pData.strings.Common_Back),
             animateChanges: true
         )
+        LightGramDiagnostics.shared.log("CONTROL_CENTER_SIGNAL: Building control center entries")
+        let entries = lightGramControlCenterEntries(state: state)
+        LightGramDiagnostics.shared.log("CONTROL_CENTER_SIGNAL: Built \(entries.count) entries")
+        LightGramDiagnostics.shared.recordStage("CONTROL_CENTER_ENTRIES_BUILT_\(entries.count)")
+        
         let listState = ItemListNodeState(
             presentationData: pData,
-            entries: lightGramControlCenterEntries(state: state),
+            entries: entries,
             style: .blocks,
             animateChanges: true
         )
+        LightGramDiagnostics.shared.log("CONTROL_CENTER_SIGNAL: ItemListNodeState created")
+        LightGramDiagnostics.shared.recordStage("CONTROL_CENTER_LIST_STATE_CREATED")
         return (controllerState, (listState, arguments))
     }
     
+    LightGramDiagnostics.shared.log("CONTROL_CENTER: Initializing ItemListController instance")
     let controller: ItemListController
     if let context = context {
         controller = ItemListController(context: context, state: signal)
@@ -728,6 +761,14 @@ public func lightGramControlCenterController(context: AccountContext? = nil) -> 
             state: signal,
             tabBarItem: nil
         )
+    }
+    LightGramDiagnostics.shared.log("CONTROL_CENTER: ItemListController initialized: \(type(of: controller))")
+    LightGramDiagnostics.shared.recordStage("CONTROL_CENTER_CONTROLLER_READY")
+    
+    controller.didAppear = { animated in
+        LightGramDiagnostics.shared.log("CONTROL_CENTER: didAppear triggered (animated=\(animated))")
+        LightGramDiagnostics.shared.recordStage("CONTROL_CENTER_DID_APPEAR")
+        LightGramDiagnostics.shared.finishOpeningSettings()
     }
     
     pushImpl = { [weak controller] c in

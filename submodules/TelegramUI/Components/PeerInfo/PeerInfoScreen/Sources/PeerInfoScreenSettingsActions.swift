@@ -22,12 +22,20 @@ import LightGramCore
 extension PeerInfoScreenNode {
     func openSettings(section: PeerInfoSettingsSection) {
         let push: (ViewController) -> Void = { [weak self] c in
+            LightGramDiagnostics.shared.log("NAVIGATION: push closure entered for controller: \(type(of: c))")
+            LightGramDiagnostics.shared.recordStage("NAVIGATION_PUSH_CLOSURE_ENTERED")
             guard let strongSelf = self, let navigationController = strongSelf.controller?.navigationController as? NavigationController else {
+                LightGramDiagnostics.shared.log("NAVIGATION_ERROR: Failed to resolve NavigationController! controller=\(String(describing: self?.controller))")
                 return
             }
+            LightGramDiagnostics.shared.log("NAVIGATION: isMyProfile=\(strongSelf.isMyProfile), navStackCount=\(navigationController.viewControllers.count)")
             
             if strongSelf.isMyProfile {
+                LightGramDiagnostics.shared.log("NAVIGATION: Calling navigationController.pushViewController")
+                LightGramDiagnostics.shared.recordStage("NAVIGATION_CALLING_PUSH_VIEW_CONTROLLER")
                 navigationController.pushViewController(c)
+                LightGramDiagnostics.shared.log("NAVIGATION: pushViewController returned")
+                LightGramDiagnostics.shared.recordStage("NAVIGATION_PUSH_VIEW_CONTROLLER_RETURNED")
             } else {
                 var updatedControllers = navigationController.viewControllers
                 for controller in navigationController.viewControllers.reversed() {
@@ -48,12 +56,37 @@ extension PeerInfoScreenNode {
                         break
                     }
                 }
+                LightGramDiagnostics.shared.log("NAVIGATION: Calling setViewControllers count=\(updatedControllers.count)")
                 navigationController.setViewControllers(updatedControllers, animated: animated)
+                LightGramDiagnostics.shared.log("NAVIGATION: setViewControllers returned")
             }
         }
         switch section {
         case .lightGram:
-            push(lightGramControlCenterController(context: self.context))
+            LightGramDiagnostics.shared.log("SETTINGS_ACTIONS: openSettings(.lightGram) triggered")
+            LightGramDiagnostics.shared.recordStage("SETTINGS_ACTION_LIGHTGRAM_ENTER")
+            let controller = lightGramControlCenterController(context: self.context)
+            LightGramDiagnostics.shared.log("SETTINGS_ACTIONS: Created lightGramControlCenterController: \(type(of: controller))")
+            LightGramDiagnostics.shared.recordStage("SETTINGS_ACTION_CONTROLLER_CREATED")
+            push(controller)
+            LightGramDiagnostics.shared.log("SETTINGS_ACTIONS: push(controller) call completed")
+            LightGramDiagnostics.shared.recordStage("SETTINGS_ACTION_PUSH_COMPLETED")
+        case .lightGramDiagnostics:
+            LightGramDiagnostics.shared.log("SETTINGS_ACTIONS: openSettings(.lightGramDiagnostics) triggered")
+            let files = LightGramDiagnostics.shared.getAllLogFiles()
+            let summary = LightGramDiagnostics.shared.fullDiagnosticSummary()
+            var activityItems: [Any] = files
+            if let summaryData = summary.data(using: .utf8) {
+                let tempURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("lightgram_diagnostic_summary.txt")
+                try? summaryData.write(to: tempURL)
+                activityItems.insert(tempURL, at: 0)
+            }
+            let activityController = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+            if let window = self.controller?.view.window {
+                activityController.popoverPresentationController?.sourceView = window
+                activityController.popoverPresentationController?.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
+            }
+            self.controller?.present(activityController, in: .window(.root))
         case .avatar:
             self.controller?.openAvatarForEditing()
         case .edit:

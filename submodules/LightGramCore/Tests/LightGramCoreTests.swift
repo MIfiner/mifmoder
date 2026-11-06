@@ -451,6 +451,25 @@ final class LightGramCoreTests: XCTestCase {
         XCTAssertTrue(controller.isNodeLoaded)
     }
     
+    func testLightGramDiagnosticsBreadcrumbs() {
+        let diag = LightGramDiagnostics.shared
+        diag.log("TEST_EVENT", details: "Diagnostic test execution")
+        diag.recordStage("TEST_STAGE")
+        XCTAssertTrue(diag.lastRecordedStage().hasPrefix("STAGE: TEST_STAGE"))
+        
+        diag.beginOpeningSettings()
+        XCTAssertTrue(diag.didCrashDuringSettingsOpen())
+        
+        diag.finishOpeningSettings()
+        XCTAssertFalse(diag.didCrashDuringSettingsOpen())
+        
+        let files = diag.getAllLogFiles()
+        XCTAssertFalse(files.isEmpty)
+        
+        let summary = diag.fullDiagnosticSummary()
+        XCTAssertTrue(summary.contains("LIGHTGRAM DIAGNOSTIC SUMMARY"))
+    }
+    
     func testSettingsControllerLifecycle() {
         let controller = lightGramSettingsController()
         XCTAssertNotNil(controller.displayNode)

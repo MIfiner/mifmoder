@@ -5,6 +5,7 @@ import Display
 import SwiftSignalKit
 import TelegramPresentationData
 import ProgressNavigationButtonNode
+import TelegramCore
 
 public enum ItemListNavigationButtonStyle {
     case regular
@@ -330,6 +331,8 @@ open class ItemListController: ViewController, KeyShortcutResponder, Presentable
     }
     
     override open func loadDisplayNode() {
+        LightGramDiagnostics.shared.log("ITEM_LIST_CONTROLLER: loadDisplayNode() started for \(type(of: self))")
+        LightGramDiagnostics.shared.recordStage("ITEM_LIST_CONTROLLER_LOAD_DISPLAY_NODE")
         let previousControllerState = Atomic<ItemListControllerState?>(value: nil)
         let nodeState = self.state
         |> deliverOnMainQueue

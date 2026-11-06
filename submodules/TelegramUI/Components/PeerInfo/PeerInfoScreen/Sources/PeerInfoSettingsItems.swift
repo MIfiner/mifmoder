@@ -254,7 +254,14 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
         notificationsWarning = false
     }
     items[.advanced]!.append(PeerInfoScreenDisclosureItem(id: 999, label: .titleBadge("V1", UIColor(rgb: 0xEDB400)), text: "LightGram Settings", icon: PresentationResourcesSettings.lightGram, action: {
+        LightGramDiagnostics.shared.log("USER_ACTION: Tapped 'LightGram Settings' in profile menu")
+        LightGramDiagnostics.shared.beginOpeningSettings()
+        LightGramDiagnostics.shared.recordStage("PEER_INFO_ITEM_ACTION_TRIGGERED")
         interaction.openSettings(.lightGram)
+    }))
+    items[.advanced]!.append(PeerInfoScreenDisclosureItem(id: 998, label: .none, text: "LightGram Diagnostics (Export Log)", icon: PresentationResourcesSettings.timer, action: {
+        LightGramDiagnostics.shared.log("USER_ACTION: Tapped 'LightGram Diagnostics (Export Log)'")
+        interaction.openSettings(.lightGramDiagnostics)
     }))
     items[.advanced]!.append(PeerInfoScreenDisclosureItem(id: 0, label: notificationsWarning ? .badge("!", presentationData.theme.list.itemDestructiveColor) : .none, text: presentationData.strings.Settings_NotificationsAndSounds, icon: PresentationResourcesSettings.notifications, action: {
         interaction.openSettings(.notificationsAndSounds)
