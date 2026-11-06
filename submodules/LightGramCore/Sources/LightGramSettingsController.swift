@@ -4,10 +4,23 @@ import Display
 import AsyncDisplayKit
 import TelegramCore
 import AccountContext
+import SwiftSignalKit
 
 public final class LightGramSettingsController: ViewController, UITableViewDataSource, UITableViewDelegate {
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private let context: AccountContext?
+    private let _ready = Promise<Bool>(true)
+    
+    override public var ready: Promise<Bool> {
+        return self._ready
+    }
+    
+    private lazy var tableNode: ASDisplayNode = {
+        let node = ASDisplayNode(viewBlock: { [weak self] in
+            return self?.tableView ?? UIView()
+        })
+        return node
+    }()
     
     public init(context: AccountContext? = nil) {
         self.context = context
@@ -26,6 +39,8 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
     
     override public func loadDisplayNode() {
         self.displayNode = ASDisplayNode()
+        self.displayNode.backgroundColor = LightGramSettings.deepGraphiteBackground
+        self.displayNode.addSubnode(self.tableNode)
         self.displayNodeDidLoad()
     }
     
@@ -44,7 +59,8 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         super.containerLayoutUpdated(layout, transition: transition)
         let navLayout = self.navigationLayout(layout: layout)
         let topOffset = self.navigationBar != nil ? navLayout.navigationFrame.maxY : (layout.statusBarHeight ?? 0)
-        self.tableView.frame = CGRect(x: 0, y: topOffset, width: layout.size.width, height: max(0, layout.size.height - topOffset))
+        let tableFrame = CGRect(x: 0, y: topOffset, width: layout.size.width, height: max(0, layout.size.height - topOffset))
+        transition.updateFrame(node: self.tableNode, frame: tableFrame)
         self.tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: layout.intrinsicInsets.bottom, right: 0)
     }
     
@@ -55,7 +71,6 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
         self.tableView.dataSource = self
         self.tableView.delegate = self
         self.tableView.tableHeaderView = self.makeHeaderView()
-        self.view.insertSubview(self.tableView, at: 0)
     }
     
     private func makeHeaderView() -> UIView {

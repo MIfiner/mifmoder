@@ -6,11 +6,24 @@ import TelegramCore
 import AccountContext
 import PresentationDataUtils
 import AlertUI
+import SwiftSignalKit
 
 public final class LightGramControlCenterController: ViewController, UITableViewDataSource, UITableViewDelegate {
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private let context: AccountContext?
     private var dashboardHeaderView: LightGramDashboardTilesHeaderView?
+    private let _ready = Promise<Bool>(true)
+    
+    override public var ready: Promise<Bool> {
+        return self._ready
+    }
+    
+    private lazy var tableNode: ASDisplayNode = {
+        let node = ASDisplayNode(viewBlock: { [weak self] in
+            return self?.tableView ?? UIView()
+        })
+        return node
+    }()
     
     private var sections: [(title: String, items: [(title: String, subtitle: String, icon: String, destination: String)])] {
         return [
@@ -50,6 +63,8 @@ public final class LightGramControlCenterController: ViewController, UITableView
     
     override public func loadDisplayNode() {
         self.displayNode = ASDisplayNode()
+        self.displayNode.backgroundColor = LightGramDesignSystem.Colors.amoledBlack
+        self.displayNode.addSubnode(self.tableNode)
         self.displayNodeDidLoad()
     }
     
@@ -72,7 +87,6 @@ public final class LightGramControlCenterController: ViewController, UITableView
         }
         self.dashboardHeaderView = header
         self.tableView.tableHeaderView = header
-        self.view.insertSubview(self.tableView, at: 0)
     }
     
     override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
@@ -81,7 +95,8 @@ public final class LightGramControlCenterController: ViewController, UITableView
         
         let navLayout = self.navigationLayout(layout: layout)
         let topOffset = self.navigationBar != nil ? navLayout.navigationFrame.maxY : (layout.statusBarHeight ?? 0)
-        self.tableView.frame = CGRect(x: 0, y: topOffset, width: layout.size.width, height: max(0, layout.size.height - topOffset))
+        let tableFrame = CGRect(x: 0, y: topOffset, width: layout.size.width, height: max(0, layout.size.height - topOffset))
+        transition.updateFrame(node: self.tableNode, frame: tableFrame)
         self.tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: layout.intrinsicInsets.bottom, right: 0)
         
         if let header = self.dashboardHeaderView {
@@ -258,6 +273,13 @@ private final class LightGramDashboardTilesHeaderView: UIView {
     func updateLayout(width: CGFloat) {
         guard width > 60.0 else { return }
         self.layoutTiles(width: width)
+    }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        if self.bounds.width > 60.0 {
+            self.layoutTiles(width: self.bounds.width)
+        }
     }
     
     private func layoutTiles(width: CGFloat) {

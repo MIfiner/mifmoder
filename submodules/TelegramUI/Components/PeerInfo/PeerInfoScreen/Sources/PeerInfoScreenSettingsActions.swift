@@ -31,7 +31,7 @@ extension PeerInfoScreenNode {
             } else {
                 var updatedControllers = navigationController.viewControllers
                 for controller in navigationController.viewControllers.reversed() {
-                    if controller !== strongSelf && !(controller is TabBarController) {
+                    if controller !== strongSelf.controller && !(controller is TabBarController) {
                         updatedControllers.removeLast()
                     } else {
                         break
@@ -53,7 +53,7 @@ extension PeerInfoScreenNode {
         }
         switch section {
         case .lightGram:
-            push(LightGramControlCenterController(context: self.context))
+            self.controller?.push(LightGramControlCenterController(context: self.context))
         case .avatar:
             self.controller?.openAvatarForEditing()
         case .edit:

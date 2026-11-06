@@ -1,4 +1,5 @@
 import XCTest
+import Display
 @testable import LightGramCore
 
 final class LightGramCoreTests: XCTestCase {
@@ -430,5 +431,41 @@ final class LightGramCoreTests: XCTestCase {
         XCTAssertTrue(snapshot.isRealData)
         XCTAssertEqual(snapshot.peakDayLabel, "Tue")
         XCTAssertEqual(snapshot.peakHourLabel, "14:00 - 15:00")
+    }
+    
+    func testControlCenterControllerLifecycle() {
+        let controller = LightGramControlCenterController()
+        XCTAssertNotNil(controller.displayNode)
+        XCTAssertNotNil(controller.view)
+        
+        let layout = ContainerViewLayout(
+            size: CGSize(width: 375.0, height: 812.0),
+            metrics: LayoutMetrics(widthClass: .compact, heightClass: .regular),
+            deviceMetrics: .iPhoneX,
+            passthroughInsets: .zero,
+            insets: UIEdgeInsets(top: 44.0, left: 0.0, bottom: 34.0, right: 0.0),
+            intrinsicInsets: UIEdgeInsets(top: 0.0, left: 0.0, bottom: 34.0, right: 0.0),
+            safeInsets: UIEdgeInsets(top: 44.0, left: 0.0, bottom: 34.0, right: 0.0)
+        )
+        controller.containerLayoutUpdated(layout, transition: .immediate)
+        XCTAssertEqual(controller.numberOfSections(in: UITableView()), 3)
+    }
+    
+    func testSettingsControllerLifecycle() {
+        let controller = LightGramSettingsController()
+        XCTAssertNotNil(controller.displayNode)
+        XCTAssertNotNil(controller.view)
+        
+        let layout = ContainerViewLayout(
+            size: CGSize(width: 375.0, height: 812.0),
+            metrics: LayoutMetrics(widthClass: .compact, heightClass: .regular),
+            deviceMetrics: .iPhoneX,
+            passthroughInsets: .zero,
+            insets: UIEdgeInsets(top: 44.0, left: 0.0, bottom: 34.0, right: 0.0),
+            intrinsicInsets: UIEdgeInsets(top: 0.0, left: 0.0, bottom: 34.0, right: 0.0),
+            safeInsets: UIEdgeInsets(top: 44.0, left: 0.0, bottom: 34.0, right: 0.0)
+        )
+        controller.containerLayoutUpdated(layout, transition: .immediate)
+        XCTAssertEqual(controller.numberOfSections(in: UITableView()), 6)
     }
 }
