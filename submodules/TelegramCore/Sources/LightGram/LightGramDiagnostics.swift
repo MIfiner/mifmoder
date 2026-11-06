@@ -86,12 +86,8 @@ public final class LightGramDiagnostics {
         self.appendAndSync(entry)
         
         // Mirror to Apple system Unified Logging
-        if #available(iOS 14.0, *) {
-            let osLogger = Logger(subsystem: "site.lightgram.ios", category: "Breadcrumbs")
-            osLogger.log("\(entry, privacy: .public)")
-        } else {
-            NSLog("%@", entry)
-        }
+        let osLog = OSLog(subsystem: "site.lightgram.ios", category: "Breadcrumbs")
+        os_log("%{public}@", log: osLog, type: .default, entry)
     }
     
     private func logInternal(_ message: String) {
