@@ -35,7 +35,12 @@ public final class LightGramControlCenterController: ViewController, UITableView
     
     public init(context: AccountContext? = nil) {
         self.context = context
-        super.init(navigationBarPresentationData: makeLightGramNavBarData())
+        if let context = context {
+            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+            super.init(navigationBarPresentationData: NavigationBarPresentationData(presentationData: presentationData))
+        } else {
+            super.init(navigationBarPresentationData: makeLightGramNavBarData())
+        }
         self.title = LightGramStrings.tr("LightGram")
     }
     
@@ -55,12 +60,14 @@ public final class LightGramControlCenterController: ViewController, UITableView
     }
     
     private func setupViews() {
+        self.tableView.contentInsetAdjustmentBehavior = .never
         self.tableView.backgroundColor = LightGramDesignSystem.Colors.amoledBlack
         self.tableView.separatorColor = LightGramDesignSystem.Colors.borderGraphite
         self.tableView.dataSource = self
         self.tableView.delegate = self
         
-        let header = LightGramDashboardTilesHeaderView(width: UIScreen.main.bounds.width) { [weak self] action in
+        let initialWidth = max(320.0, self.view.bounds.width > 0 ? self.view.bounds.width : UIScreen.main.bounds.width)
+        let header = LightGramDashboardTilesHeaderView(width: initialWidth) { [weak self] action in
             self?.handleTileAction(action)
         }
         self.dashboardHeaderView = header
@@ -70,14 +77,18 @@ public final class LightGramControlCenterController: ViewController, UITableView
     
     override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
         super.containerLayoutUpdated(layout, transition: transition)
+        guard layout.size.width > 0, layout.size.height > 0 else { return }
+        
         let navLayout = self.navigationLayout(layout: layout)
         let topOffset = self.navigationBar != nil ? navLayout.navigationFrame.maxY : (layout.statusBarHeight ?? 0)
         self.tableView.frame = CGRect(x: 0, y: topOffset, width: layout.size.width, height: max(0, layout.size.height - topOffset))
         self.tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: layout.intrinsicInsets.bottom, right: 0)
         
         if let header = self.dashboardHeaderView {
-            header.updateLayout(width: layout.size.width)
-            self.tableView.tableHeaderView = header
+            if abs(header.bounds.width - layout.size.width) > 1.0 {
+                header.updateLayout(width: layout.size.width)
+                self.tableView.tableHeaderView = header
+            }
         }
     }
     
@@ -216,7 +227,8 @@ private final class LightGramDashboardTilesHeaderView: UIView {
     
     init(width: CGFloat, onSelect: @escaping (DashboardTileAction) -> Void) {
         self.onSelect = onSelect
-        super.init(frame: CGRect(x: 0, y: 0, width: width, height: 320))
+        let safeWidth = max(320.0, width)
+        super.init(frame: CGRect(x: 0, y: 0, width: safeWidth, height: 320))
         self.backgroundColor = LightGramDesignSystem.Colors.amoledBlack
         
         let tileConfigs: [(icon: String, titleKey: String, subtitle: String, action: DashboardTileAction)] = [
@@ -236,7 +248,7 @@ private final class LightGramDashboardTilesHeaderView: UIView {
             self.tiles.append(tile)
         }
         
-        self.layoutTiles(width: width)
+        self.layoutTiles(width: safeWidth)
     }
     
     required init?(coder: NSCoder) {
@@ -244,13 +256,15 @@ private final class LightGramDashboardTilesHeaderView: UIView {
     }
     
     func updateLayout(width: CGFloat) {
+        guard width > 60.0 else { return }
         self.layoutTiles(width: width)
     }
     
     private func layoutTiles(width: CGFloat) {
+        guard width > 60.0 else { return }
         let padding: CGFloat = 16.0
         let spacing: CGFloat = 12.0
-        let colWidth = (width - padding * 2 - spacing) / 2.0
+        let colWidth = max(60.0, (width - padding * 2.0 - spacing) / 2.0)
         let tileHeight: CGFloat = 82.0
         
         for (i, tile) in self.tiles.enumerated() {
@@ -261,7 +275,7 @@ private final class LightGramDashboardTilesHeaderView: UIView {
             tile.frame = CGRect(x: x, y: y, width: colWidth, height: tileHeight)
         }
         
-        let totalH = 14.0 + 3 * (tileHeight + spacing) + 8.0
+        let totalH = 14.0 + 3.0 * (tileHeight + spacing) + 8.0
         self.frame = CGRect(x: 0, y: 0, width: width, height: totalH)
     }
 }
@@ -274,7 +288,7 @@ private final class LightGramTileButton: UIControl {
     
     init(icon: String, title: String, subtitle: String, action: @escaping () -> Void) {
         self.action = action
-        super.init(frame: .zero)
+        super.init(frame: CGRect(x: 0, y: 0, width: 140.0, height: 82.0))
         
         self.backgroundColor = LightGramDesignSystem.Colors.cardSurface
         self.layer.cornerRadius = 16.0
@@ -290,11 +304,15 @@ private final class LightGramTileButton: UIControl {
         self.titleLabel.text = title
         self.titleLabel.font = UIFont.systemFont(ofSize: 15, weight: .bold)
         self.titleLabel.textColor = .white
+        self.titleLabel.adjustsFontSizeToFitWidth = true
+        self.titleLabel.minimumScaleFactor = 0.75
         self.addSubview(self.titleLabel)
         
         self.subtitleLabel.text = subtitle
         self.subtitleLabel.font = UIFont.systemFont(ofSize: 11, weight: .medium)
         self.subtitleLabel.textColor = LightGramSettings.signatureYellowAccent
+        self.subtitleLabel.adjustsFontSizeToFitWidth = true
+        self.subtitleLabel.minimumScaleFactor = 0.75
         self.addSubview(self.subtitleLabel)
         
         self.addTarget(self, action: #selector(self.touchDown), for: [.touchDown, .touchDragEnter])
@@ -326,10 +344,11 @@ private final class LightGramTileButton: UIControl {
     
     override func layoutSubviews() {
         super.layoutSubviews()
+        guard self.bounds.width > 20.0, self.bounds.height > 20.0 else { return }
         
-        self.iconLabel.frame = CGRect(x: 14.0, y: 12.0, width: 34.0, height: 34.0)
+        self.iconLabel.frame = CGRect(x: 14.0, y: 14.0, width: 34.0, height: 34.0)
         let textX = self.iconLabel.frame.maxX + 8.0
-        let maxTextW = self.bounds.width - textX - 8.0
+        let maxTextW = max(0.0, self.bounds.width - textX - 8.0)
         
         self.titleLabel.frame = CGRect(x: textX, y: 18.0, width: maxTextW, height: 20.0)
         self.subtitleLabel.frame = CGRect(x: textX, y: 40.0, width: maxTextW, height: 16.0)

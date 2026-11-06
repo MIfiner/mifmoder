@@ -11,7 +11,12 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
     
     public init(context: AccountContext? = nil) {
         self.context = context
-        super.init(navigationBarPresentationData: makeLightGramNavBarData())
+        if let context = context {
+            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+            super.init(navigationBarPresentationData: NavigationBarPresentationData(presentationData: presentationData))
+        } else {
+            super.init(navigationBarPresentationData: makeLightGramNavBarData())
+        }
         self.title = LightGramStrings.tr("Settings")
     }
     
@@ -44,6 +49,7 @@ public final class LightGramSettingsController: ViewController, UITableViewDataS
     }
     
     private func setupTableView() {
+        self.tableView.contentInsetAdjustmentBehavior = .never
         self.tableView.backgroundColor = LightGramSettings.deepGraphiteBackground
         self.tableView.separatorColor = UIColor(white: 0.25, alpha: 1.0)
         self.tableView.dataSource = self

@@ -1635,7 +1635,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                 // 4. LightGram: Send as Circle (convert VO video / video to Circle)
                 if isVideo {
                     actions.append(.action(ContextMenuActionItem(text: LightGramStrings.tr("MediaVault_SendAsCircle"), icon: { theme in
-                        return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Play"), color: LightGramSettings.signatureYellowAccent)
+                        return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Resend"), color: LightGramSettings.signatureYellowAccent)
                     }, action: { _, f in
                         if let file = targetMedia as? TelegramMediaFile {
                             let cachedPath = context.engine.resources.completedResourcePath(id: EngineMediaResource.Id(file.resource.id.stringRepresentation))
