@@ -13,35 +13,33 @@ import AlertUI
 
 // MARK: - Reactive State
 private struct LightGramSettingsState: Equatable {
-    var ghostModeEnabled: Bool
-    var dontSendReadReceipts: Bool
-    var hideTypingStatus: Bool
-    var hideOnlineStatus: Bool
-    var stealthStoryViews: Bool
-    var markOnReply: Bool
+    var isGhostModeEnabled: Bool
+    var suppressReadHistory: Bool
+    var suppressTyping: Bool
+    var suppressStoryViews: Bool
+    var markAsReadOnReply: Bool
     
-    var spyModeEnabled: Bool
+    var isSpyModeEnabled: Bool
     var saveDeletedMessages: Bool
     var saveEditHistory: Bool
     
     var nativeNotificationsEnabled: Bool
-    var autoSaveOneTimeMedia: Bool
+    var biometricLockMediaVault: Bool
     
     init() {
         let s = LightGramSettings.shared
-        self.ghostModeEnabled = s.ghostModeEnabled
-        self.dontSendReadReceipts = s.dontSendReadReceipts
-        self.hideTypingStatus = s.hideTypingStatus
-        self.hideOnlineStatus = s.hideOnlineStatus
-        self.stealthStoryViews = s.stealthStoryViews
-        self.markOnReply = s.markOnReply
+        self.isGhostModeEnabled = s.isGhostModeEnabled
+        self.suppressReadHistory = s.suppressReadHistory
+        self.suppressTyping = s.suppressTyping
+        self.suppressStoryViews = s.suppressStoryViews
+        self.markAsReadOnReply = s.markAsReadOnReply
         
-        self.spyModeEnabled = s.spyModeEnabled
+        self.isSpyModeEnabled = s.isSpyModeEnabled
         self.saveDeletedMessages = s.saveDeletedMessages
         self.saveEditHistory = s.saveEditHistory
         
         self.nativeNotificationsEnabled = s.nativeNotificationsEnabled
-        self.autoSaveOneTimeMedia = s.autoSaveOneTimeMedia
+        self.biometricLockMediaVault = s.biometricLockMediaVault
     }
 }
 
@@ -80,7 +78,6 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
     case ghostMaster(Bool)
     case ghostNoReadReceipts(Bool)
     case ghostHideTyping(Bool)
-    case ghostStealthOnline(Bool)
     case ghostStealthStories(Bool)
     case ghostMarkOnReply(Bool)
     case ghostFooter
@@ -96,7 +93,7 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
     // Notifications & Media
     case notificationsHeader
     case nativeNotifications(Bool)
-    case autoSaveVO(Bool)
+    case biometricLockVault(Bool)
     case notificationsFooter
     
     // Tools & Control Center
@@ -107,11 +104,11 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
     
     var section: ItemListSectionId {
         switch self {
-        case .ghostHeader, .ghostMaster, .ghostNoReadReceipts, .ghostHideTyping, .ghostStealthOnline, .ghostStealthStories, .ghostMarkOnReply, .ghostFooter:
+        case .ghostHeader, .ghostMaster, .ghostNoReadReceipts, .ghostHideTyping, .ghostStealthStories, .ghostMarkOnReply, .ghostFooter:
             return LightGramSettingsSection.ghostMode.rawValue
         case .spyHeader, .spyMaster, .spySaveDeleted, .spySaveEdits, .spyOpenArchive, .spyFooter:
             return LightGramSettingsSection.spyMode.rawValue
-        case .notificationsHeader, .nativeNotifications, .autoSaveVO, .notificationsFooter:
+        case .notificationsHeader, .nativeNotifications, .biometricLockVault, .notificationsFooter:
             return LightGramSettingsSection.notifications.rawValue
         case .toolsHeader, .openControlCenter, .logosAndThemes, .toolsFooter:
             return LightGramSettingsSection.tools.rawValue
@@ -124,10 +121,9 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
         case .ghostMaster: return 1
         case .ghostNoReadReceipts: return 2
         case .ghostHideTyping: return 3
-        case .ghostStealthOnline: return 4
-        case .ghostStealthStories: return 5
-        case .ghostMarkOnReply: return 6
-        case .ghostFooter: return 7
+        case .ghostStealthStories: return 4
+        case .ghostMarkOnReply: return 5
+        case .ghostFooter: return 6
             
         case .spyHeader: return 10
         case .spyMaster: return 11
@@ -138,7 +134,7 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
             
         case .notificationsHeader: return 20
         case .nativeNotifications: return 21
-        case .autoSaveVO: return 22
+        case .biometricLockVault: return 22
         case .notificationsFooter: return 23
             
         case .toolsHeader: return 30
@@ -170,9 +166,9 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
                 sectionId: self.section,
                 style: .blocks,
                 updated: { val in
-                    LightGramSettings.shared.ghostModeEnabled = val
+                    LightGramSettings.shared.isGhostModeEnabled = val
                     LightGramDesignSystem.Haptics.impact(.medium)
-                    args.updateState { $0.ghostModeEnabled = val }
+                    args.updateState { $0.isGhostModeEnabled = val }
                 }
             )
         case let .ghostNoReadReceipts(value):
@@ -183,9 +179,9 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
                 sectionId: self.section,
                 style: .blocks,
                 updated: { val in
-                    LightGramSettings.shared.dontSendReadReceipts = val
+                    LightGramSettings.shared.suppressReadHistory = val
                     LightGramDesignSystem.Haptics.selection()
-                    args.updateState { $0.dontSendReadReceipts = val }
+                    args.updateState { $0.suppressReadHistory = val }
                 }
             )
         case let .ghostHideTyping(value):
@@ -196,22 +192,9 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
                 sectionId: self.section,
                 style: .blocks,
                 updated: { val in
-                    LightGramSettings.shared.hideTypingStatus = val
+                    LightGramSettings.shared.suppressTyping = val
                     LightGramDesignSystem.Haptics.selection()
-                    args.updateState { $0.hideTypingStatus = val }
-                }
-            )
-        case let .ghostStealthOnline(value):
-            return ItemListSwitchItem(
-                presentationData: presentationData,
-                title: LightGramStrings.tr("GhostMode_StealthOnline"),
-                value: value,
-                sectionId: self.section,
-                style: .blocks,
-                updated: { val in
-                    LightGramSettings.shared.hideOnlineStatus = val
-                    LightGramDesignSystem.Haptics.selection()
-                    args.updateState { $0.hideOnlineStatus = val }
+                    args.updateState { $0.suppressTyping = val }
                 }
             )
         case let .ghostStealthStories(value):
@@ -222,9 +205,9 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
                 sectionId: self.section,
                 style: .blocks,
                 updated: { val in
-                    LightGramSettings.shared.stealthStoryViews = val
+                    LightGramSettings.shared.suppressStoryViews = val
                     LightGramDesignSystem.Haptics.selection()
-                    args.updateState { $0.stealthStoryViews = val }
+                    args.updateState { $0.suppressStoryViews = val }
                 }
             )
         case let .ghostMarkOnReply(value):
@@ -235,9 +218,9 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
                 sectionId: self.section,
                 style: .blocks,
                 updated: { val in
-                    LightGramSettings.shared.markOnReply = val
+                    LightGramSettings.shared.markAsReadOnReply = val
                     LightGramDesignSystem.Haptics.selection()
-                    args.updateState { $0.markOnReply = val }
+                    args.updateState { $0.markAsReadOnReply = val }
                 }
             )
         case .ghostFooter:
@@ -261,9 +244,9 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
                 sectionId: self.section,
                 style: .blocks,
                 updated: { val in
-                    LightGramSettings.shared.spyModeEnabled = val
+                    LightGramSettings.shared.isSpyModeEnabled = val
                     LightGramDesignSystem.Haptics.impact(.medium)
-                    args.updateState { $0.spyModeEnabled = val }
+                    args.updateState { $0.isSpyModeEnabled = val }
                 }
             )
         case let .spySaveDeleted(value):
@@ -329,17 +312,17 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
                     args.updateState { $0.nativeNotificationsEnabled = val }
                 }
             )
-        case let .autoSaveVO(value):
+        case let .biometricLockVault(value):
             return ItemListSwitchItem(
                 presentationData: presentationData,
-                title: "💾  Auto-Save VO to Vault",
+                title: "🔒  Face ID Vault Protection",
                 value: value,
                 sectionId: self.section,
                 style: .blocks,
                 updated: { val in
-                    LightGramSettings.shared.autoSaveOneTimeMedia = val
+                    LightGramSettings.shared.biometricLockMediaVault = val
                     LightGramDesignSystem.Haptics.selection()
-                    args.updateState { $0.autoSaveOneTimeMedia = val }
+                    args.updateState { $0.biometricLockMediaVault = val }
                 }
             )
         case .notificationsFooter:
@@ -382,7 +365,7 @@ private enum LightGramSettingsEntry: ItemListNodeEntry {
         case .toolsFooter:
             return ItemListTextItem(
                 presentationData: presentationData,
-                text: .plain("LightGram Personal Edition v2.0 (Build 131944)"),
+                text: .plain("LightGram Personal Edition v2.0 (Build 131945)"),
                 sectionId: self.section
             )
         }
@@ -395,20 +378,19 @@ private func lightGramSettingsEntries(state: LightGramSettingsState) -> [LightGr
     
     // Ghost Mode
     entries.append(.ghostHeader)
-    entries.append(.ghostMaster(state.ghostModeEnabled))
-    if state.ghostModeEnabled {
-        entries.append(.ghostNoReadReceipts(state.dontSendReadReceipts))
-        entries.append(.ghostHideTyping(state.hideTypingStatus))
-        entries.append(.ghostStealthOnline(state.hideOnlineStatus))
-        entries.append(.ghostStealthStories(state.stealthStoryViews))
-        entries.append(.ghostMarkOnReply(state.markOnReply))
+    entries.append(.ghostMaster(state.isGhostModeEnabled))
+    if state.isGhostModeEnabled {
+        entries.append(.ghostNoReadReceipts(state.suppressReadHistory))
+        entries.append(.ghostHideTyping(state.suppressTyping))
+        entries.append(.ghostStealthStories(state.suppressStoryViews))
+        entries.append(.ghostMarkOnReply(state.markAsReadOnReply))
     }
     entries.append(.ghostFooter)
     
     // Spy Mode
     entries.append(.spyHeader)
-    entries.append(.spyMaster(state.spyModeEnabled))
-    if state.spyModeEnabled {
+    entries.append(.spyMaster(state.isSpyModeEnabled))
+    if state.isSpyModeEnabled {
         entries.append(.spySaveDeleted(state.saveDeletedMessages))
         entries.append(.spySaveEdits(state.saveEditHistory))
         entries.append(.spyOpenArchive)
@@ -418,7 +400,7 @@ private func lightGramSettingsEntries(state: LightGramSettingsState) -> [LightGr
     // Notifications
     entries.append(.notificationsHeader)
     entries.append(.nativeNotifications(state.nativeNotificationsEnabled))
-    entries.append(.autoSaveVO(state.autoSaveOneTimeMedia))
+    entries.append(.biometricLockVault(state.biometricLockMediaVault))
     entries.append(.notificationsFooter)
     
     // Tools
