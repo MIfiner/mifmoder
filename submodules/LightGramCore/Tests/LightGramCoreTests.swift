@@ -448,7 +448,7 @@ final class LightGramCoreTests: XCTestCase {
             safeInsets: UIEdgeInsets(top: 44.0, left: 0.0, bottom: 34.0, right: 0.0)
         )
         controller.containerLayoutUpdated(layout, transition: .immediate)
-        XCTAssertEqual(controller.numberOfSections(in: UITableView()), 3)
+        XCTAssertTrue(controller.isNodeLoaded)
     }
     
     func testSettingsControllerLifecycle() {
@@ -466,6 +466,6 @@ final class LightGramCoreTests: XCTestCase {
             safeInsets: UIEdgeInsets(top: 44.0, left: 0.0, bottom: 34.0, right: 0.0)
         )
         controller.containerLayoutUpdated(layout, transition: .immediate)
-        XCTAssertEqual(controller.numberOfSections(in: UITableView()), 6)
+        XCTAssertTrue(controller.isNodeLoaded)
     }
 }

@@ -2,406 +2,513 @@ import Foundation
 import UIKit
 import Display
 import AsyncDisplayKit
-import TelegramCore
-import AccountContext
 import SwiftSignalKit
+import TelegramCore
+import TelegramPresentationData
+import TelegramUIPreferences
+import ItemListUI
+import PresentationDataUtils
+import AccountContext
+import AlertUI
 
-public final class LightGramSettingsController: ViewController, UITableViewDataSource, UITableViewDelegate {
-    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
-    private let context: AccountContext?
-    private let _ready = Promise<Bool>(true)
+// MARK: - Reactive State
+private struct LightGramSettingsState: Equatable {
+    var ghostModeEnabled: Bool
+    var dontSendReadReceipts: Bool
+    var hideTypingStatus: Bool
+    var hideOnlineStatus: Bool
+    var stealthStoryViews: Bool
+    var markOnReply: Bool
     
-    override public var ready: Promise<Bool> {
-        return self._ready
+    var spyModeEnabled: Bool
+    var saveDeletedMessages: Bool
+    var saveEditHistory: Bool
+    
+    var nativeNotificationsEnabled: Bool
+    var autoSaveOneTimeMedia: Bool
+    
+    init() {
+        let s = LightGramSettings.shared
+        self.ghostModeEnabled = s.ghostModeEnabled
+        self.dontSendReadReceipts = s.dontSendReadReceipts
+        self.hideTypingStatus = s.hideTypingStatus
+        self.hideOnlineStatus = s.hideOnlineStatus
+        self.stealthStoryViews = s.stealthStoryViews
+        self.markOnReply = s.markOnReply
+        
+        self.spyModeEnabled = s.spyModeEnabled
+        self.saveDeletedMessages = s.saveDeletedMessages
+        self.saveEditHistory = s.saveEditHistory
+        
+        self.nativeNotificationsEnabled = s.nativeNotificationsEnabled
+        self.autoSaveOneTimeMedia = s.autoSaveOneTimeMedia
+    }
+}
+
+// MARK: - Arguments
+private final class LightGramSettingsArguments {
+    let context: AccountContext?
+    let push: (ViewController) -> Void
+    let present: (ViewController) -> Void
+    let updateState: ((inout LightGramSettingsState) -> Void) -> Void
+    
+    init(
+        context: AccountContext?,
+        push: @escaping (ViewController) -> Void,
+        present: @escaping (ViewController) -> Void,
+        updateState: @escaping ((inout LightGramSettingsState) -> Void) -> Void
+    ) {
+        self.context = context
+        self.push = push
+        self.present = present
+        self.updateState = updateState
+    }
+}
+
+// MARK: - Sections
+private enum LightGramSettingsSection: Int32 {
+    case ghostMode = 0
+    case spyMode = 1
+    case notifications = 2
+    case tools = 3
+}
+
+// MARK: - Entries
+private enum LightGramSettingsEntry: ItemListNodeEntry {
+    // Ghost Mode
+    case ghostHeader
+    case ghostMaster(Bool)
+    case ghostNoReadReceipts(Bool)
+    case ghostHideTyping(Bool)
+    case ghostStealthOnline(Bool)
+    case ghostStealthStories(Bool)
+    case ghostMarkOnReply(Bool)
+    case ghostFooter
+    
+    // Spy Mode
+    case spyHeader
+    case spyMaster(Bool)
+    case spySaveDeleted(Bool)
+    case spySaveEdits(Bool)
+    case spyOpenArchive
+    case spyFooter
+    
+    // Notifications & Media
+    case notificationsHeader
+    case nativeNotifications(Bool)
+    case autoSaveVO(Bool)
+    case notificationsFooter
+    
+    // Tools & Control Center
+    case toolsHeader
+    case openControlCenter
+    case logosAndThemes
+    case toolsFooter
+    
+    var section: ItemListSectionId {
+        switch self {
+        case .ghostHeader, .ghostMaster, .ghostNoReadReceipts, .ghostHideTyping, .ghostStealthOnline, .ghostStealthStories, .ghostMarkOnReply, .ghostFooter:
+            return LightGramSettingsSection.ghostMode.rawValue
+        case .spyHeader, .spyMaster, .spySaveDeleted, .spySaveEdits, .spyOpenArchive, .spyFooter:
+            return LightGramSettingsSection.spyMode.rawValue
+        case .notificationsHeader, .nativeNotifications, .autoSaveVO, .notificationsFooter:
+            return LightGramSettingsSection.notifications.rawValue
+        case .toolsHeader, .openControlCenter, .logosAndThemes, .toolsFooter:
+            return LightGramSettingsSection.tools.rawValue
+        }
     }
     
-    private lazy var tableNode: ASDisplayNode = {
-        let node = ASDisplayNode(viewBlock: { [weak self] in
-            return self?.tableView ?? UIView()
-        })
-        return node
-    }()
-    
-    public init(context: AccountContext? = nil) {
-        self.context = context
-        if let context = context {
-            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-            super.init(navigationBarPresentationData: NavigationBarPresentationData(presentationData: presentationData))
-        } else {
-            super.init(navigationBarPresentationData: makeLightGramNavBarData())
+    var stableId: Int32 {
+        switch self {
+        case .ghostHeader: return 0
+        case .ghostMaster: return 1
+        case .ghostNoReadReceipts: return 2
+        case .ghostHideTyping: return 3
+        case .ghostStealthOnline: return 4
+        case .ghostStealthStories: return 5
+        case .ghostMarkOnReply: return 6
+        case .ghostFooter: return 7
+            
+        case .spyHeader: return 10
+        case .spyMaster: return 11
+        case .spySaveDeleted: return 12
+        case .spySaveEdits: return 13
+        case .spyOpenArchive: return 14
+        case .spyFooter: return 15
+            
+        case .notificationsHeader: return 20
+        case .nativeNotifications: return 21
+        case .autoSaveVO: return 22
+        case .notificationsFooter: return 23
+            
+        case .toolsHeader: return 30
+        case .openControlCenter: return 31
+        case .logosAndThemes: return 32
+        case .toolsFooter: return 33
         }
-        self.title = LightGramStrings.tr("Settings")
+    }
+    
+    static func <(lhs: LightGramSettingsEntry, rhs: LightGramSettingsEntry) -> Bool {
+        return lhs.stableId < rhs.stableId
+    }
+    
+    func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
+        let args = arguments as! LightGramSettingsArguments
+        
+        switch self {
+        case .ghostHeader:
+            return ItemListSectionHeaderItem(
+                presentationData: presentationData,
+                text: LightGramStrings.tr("GhostMode_Header"),
+                sectionId: self.section
+            )
+        case let .ghostMaster(value):
+            return ItemListSwitchItem(
+                presentationData: presentationData,
+                title: "👻  \(LightGramStrings.tr("GhostMode_Master"))",
+                value: value,
+                sectionId: self.section,
+                style: .blocks,
+                updated: { val in
+                    LightGramSettings.shared.ghostModeEnabled = val
+                    LightGramDesignSystem.Haptics.impact(.medium)
+                    args.updateState { $0.ghostModeEnabled = val }
+                }
+            )
+        case let .ghostNoReadReceipts(value):
+            return ItemListSwitchItem(
+                presentationData: presentationData,
+                title: LightGramStrings.tr("GhostMode_NoReadReceipts"),
+                value: value,
+                sectionId: self.section,
+                style: .blocks,
+                updated: { val in
+                    LightGramSettings.shared.dontSendReadReceipts = val
+                    LightGramDesignSystem.Haptics.selection()
+                    args.updateState { $0.dontSendReadReceipts = val }
+                }
+            )
+        case let .ghostHideTyping(value):
+            return ItemListSwitchItem(
+                presentationData: presentationData,
+                title: LightGramStrings.tr("GhostMode_HideTyping"),
+                value: value,
+                sectionId: self.section,
+                style: .blocks,
+                updated: { val in
+                    LightGramSettings.shared.hideTypingStatus = val
+                    LightGramDesignSystem.Haptics.selection()
+                    args.updateState { $0.hideTypingStatus = val }
+                }
+            )
+        case let .ghostStealthOnline(value):
+            return ItemListSwitchItem(
+                presentationData: presentationData,
+                title: LightGramStrings.tr("GhostMode_StealthOnline"),
+                value: value,
+                sectionId: self.section,
+                style: .blocks,
+                updated: { val in
+                    LightGramSettings.shared.hideOnlineStatus = val
+                    LightGramDesignSystem.Haptics.selection()
+                    args.updateState { $0.hideOnlineStatus = val }
+                }
+            )
+        case let .ghostStealthStories(value):
+            return ItemListSwitchItem(
+                presentationData: presentationData,
+                title: LightGramStrings.tr("GhostMode_StealthStory"),
+                value: value,
+                sectionId: self.section,
+                style: .blocks,
+                updated: { val in
+                    LightGramSettings.shared.stealthStoryViews = val
+                    LightGramDesignSystem.Haptics.selection()
+                    args.updateState { $0.stealthStoryViews = val }
+                }
+            )
+        case let .ghostMarkOnReply(value):
+            return ItemListSwitchItem(
+                presentationData: presentationData,
+                title: LightGramStrings.tr("GhostMode_MarkOnReply"),
+                value: value,
+                sectionId: self.section,
+                style: .blocks,
+                updated: { val in
+                    LightGramSettings.shared.markOnReply = val
+                    LightGramDesignSystem.Haptics.selection()
+                    args.updateState { $0.markOnReply = val }
+                }
+            )
+        case .ghostFooter:
+            return ItemListTextItem(
+                presentationData: presentationData,
+                text: .plain(LightGramStrings.tr("GhostMode_Master_Desc")),
+                sectionId: self.section
+            )
+            
+        case .spyHeader:
+            return ItemListSectionHeaderItem(
+                presentationData: presentationData,
+                text: LightGramStrings.tr("SpyMode_Header"),
+                sectionId: self.section
+            )
+        case let .spyMaster(value):
+            return ItemListSwitchItem(
+                presentationData: presentationData,
+                title: "🕵️‍♂️  \(LightGramStrings.tr("SpyMode_Master"))",
+                value: value,
+                sectionId: self.section,
+                style: .blocks,
+                updated: { val in
+                    LightGramSettings.shared.spyModeEnabled = val
+                    LightGramDesignSystem.Haptics.impact(.medium)
+                    args.updateState { $0.spyModeEnabled = val }
+                }
+            )
+        case let .spySaveDeleted(value):
+            return ItemListSwitchItem(
+                presentationData: presentationData,
+                title: LightGramStrings.tr("SpyMode_SaveDeleted"),
+                value: value,
+                sectionId: self.section,
+                style: .blocks,
+                updated: { val in
+                    LightGramSettings.shared.saveDeletedMessages = val
+                    LightGramDesignSystem.Haptics.selection()
+                    args.updateState { $0.saveDeletedMessages = val }
+                }
+            )
+        case let .spySaveEdits(value):
+            return ItemListSwitchItem(
+                presentationData: presentationData,
+                title: LightGramStrings.tr("SpyMode_SaveEdits"),
+                value: value,
+                sectionId: self.section,
+                style: .blocks,
+                updated: { val in
+                    LightGramSettings.shared.saveEditHistory = val
+                    LightGramDesignSystem.Haptics.selection()
+                    args.updateState { $0.saveEditHistory = val }
+                }
+            )
+        case .spyOpenArchive:
+            return ItemListDisclosureItem(
+                presentationData: presentationData,
+                title: "🗄  \(LightGramStrings.tr("SpyMode_OpenArchive"))",
+                label: "Archive",
+                sectionId: self.section,
+                style: .blocks,
+                action: {
+                    args.push(LightGramSpyArchiveController())
+                }
+            )
+        case .spyFooter:
+            return ItemListTextItem(
+                presentationData: presentationData,
+                text: .plain(LightGramStrings.tr("SpyMode_Master_Desc")),
+                sectionId: self.section
+            )
+            
+        case .notificationsHeader:
+            return ItemListSectionHeaderItem(
+                presentationData: presentationData,
+                text: "NOTIFICATIONS & PROTECTION",
+                sectionId: self.section
+            )
+        case let .nativeNotifications(value):
+            return ItemListSwitchItem(
+                presentationData: presentationData,
+                title: "🔔  Native Push Notifications",
+                value: value,
+                sectionId: self.section,
+                style: .blocks,
+                updated: { val in
+                    LightGramSettings.shared.nativeNotificationsEnabled = val
+                    LightGramDesignSystem.Haptics.selection()
+                    args.updateState { $0.nativeNotificationsEnabled = val }
+                }
+            )
+        case let .autoSaveVO(value):
+            return ItemListSwitchItem(
+                presentationData: presentationData,
+                title: "💾  Auto-Save VO to Vault",
+                value: value,
+                sectionId: self.section,
+                style: .blocks,
+                updated: { val in
+                    LightGramSettings.shared.autoSaveOneTimeMedia = val
+                    LightGramDesignSystem.Haptics.selection()
+                    args.updateState { $0.autoSaveOneTimeMedia = val }
+                }
+            )
+        case .notificationsFooter:
+            return ItemListTextItem(
+                presentationData: presentationData,
+                text: .plain("Push notifications run locally via APNs."),
+                sectionId: self.section
+            )
+            
+        case .toolsHeader:
+            return ItemListSectionHeaderItem(
+                presentationData: presentationData,
+                text: "TOOLS & DASHBOARD",
+                sectionId: self.section
+            )
+        case .openControlCenter:
+            return ItemListDisclosureItem(
+                presentationData: presentationData,
+                title: "⚡️  Control Center & Hub",
+                label: "Dashboard",
+                sectionId: self.section,
+                style: .blocks,
+                action: {
+                    args.push(LightGramControlCenterController(context: args.context))
+                }
+            )
+        case .logosAndThemes:
+            return ItemListDisclosureItem(
+                presentationData: presentationData,
+                title: "🎨  \(LightGramStrings.tr("Logos_Title"))",
+                label: "Themes",
+                sectionId: self.section,
+                style: .blocks,
+                action: {
+                    if let context = args.context {
+                        args.push(LightGramLogosController(context: context))
+                    }
+                }
+            )
+        case .toolsFooter:
+            return ItemListTextItem(
+                presentationData: presentationData,
+                text: .plain("LightGram Personal Edition v2.0 (Build 131944)"),
+                sectionId: self.section
+            )
+        }
+    }
+}
+
+// MARK: - Entries Builder
+private func lightGramSettingsEntries(state: LightGramSettingsState) -> [LightGramSettingsEntry] {
+    var entries: [LightGramSettingsEntry] = []
+    
+    // Ghost Mode
+    entries.append(.ghostHeader)
+    entries.append(.ghostMaster(state.ghostModeEnabled))
+    if state.ghostModeEnabled {
+        entries.append(.ghostNoReadReceipts(state.dontSendReadReceipts))
+        entries.append(.ghostHideTyping(state.hideTypingStatus))
+        entries.append(.ghostStealthOnline(state.hideOnlineStatus))
+        entries.append(.ghostStealthStories(state.stealthStoryViews))
+        entries.append(.ghostMarkOnReply(state.markOnReply))
+    }
+    entries.append(.ghostFooter)
+    
+    // Spy Mode
+    entries.append(.spyHeader)
+    entries.append(.spyMaster(state.spyModeEnabled))
+    if state.spyModeEnabled {
+        entries.append(.spySaveDeleted(state.saveDeletedMessages))
+        entries.append(.spySaveEdits(state.saveEditHistory))
+        entries.append(.spyOpenArchive)
+    }
+    entries.append(.spyFooter)
+    
+    // Notifications
+    entries.append(.notificationsHeader)
+    entries.append(.nativeNotifications(state.nativeNotificationsEnabled))
+    entries.append(.autoSaveVO(state.autoSaveOneTimeMedia))
+    entries.append(.notificationsFooter)
+    
+    // Tools
+    entries.append(.toolsHeader)
+    entries.append(.openControlCenter)
+    entries.append(.logosAndThemes)
+    entries.append(.toolsFooter)
+    
+    return entries
+}
+
+// MARK: - Controller Class
+public final class LightGramSettingsController: ItemListController {
+    public init(context: AccountContext? = nil) {
+        var pushImpl: ((ViewController) -> Void)?
+        var presentImpl: ((ViewController) -> Void)?
+        
+        let stateValue = Atomic(value: LightGramSettingsState())
+        let statePromise = ValuePromise<LightGramSettingsState>(stateValue.with { $0 }, ignoreRepeated: true)
+        
+        let updateState: ((inout LightGramSettingsState) -> Void) -> Void = { f in
+            let updated = stateValue.modify { current in
+                var mod = current
+                f(&mod)
+                return mod
+            }
+            statePromise.set(updated)
+        }
+        
+        let arguments = LightGramSettingsArguments(
+            context: context,
+            push: { c in pushImpl?(c) },
+            present: { c in presentImpl?(c) },
+            updateState: updateState
+        )
+        
+        let presentationData: ItemListPresentationData
+        let updatedPresentationData: Signal<ItemListPresentationData, NoError>
+        
+        if let context = context {
+            let pd = context.sharedContext.currentPresentationData.with { $0 }
+            presentationData = ItemListPresentationData(pd)
+            updatedPresentationData = context.sharedContext.presentationData |> map(ItemListPresentationData.init(_:))
+        } else {
+            let pd = defaultPresentationData()
+            presentationData = ItemListPresentationData(pd)
+            updatedPresentationData = .single(presentationData)
+        }
+        
+        let stateSignal: Signal<(ItemListControllerState, (ItemListNodeState, Any)), NoError> = combineLatest(
+            queue: .mainQueue(),
+            updatedPresentationData,
+            statePromise.get()
+        )
+        |> deliverOnMainQueue
+        |> map { pData, state -> (ItemListControllerState, (ItemListNodeState, Any)) in
+            let controllerState = ItemListControllerState(
+                presentationData: pData,
+                title: .text(LightGramStrings.tr("Settings")),
+                leftNavigationButton: nil,
+                rightNavigationButton: nil,
+                backNavigationButton: ItemListBackButton(title: pData.strings.Common_Back),
+                animateChanges: true
+            )
+            let listState = ItemListNodeState(
+                presentationData: pData,
+                entries: lightGramSettingsEntries(state: state),
+                style: .blocks,
+                animateChanges: true
+            )
+            return (controllerState, (listState, arguments))
+        }
+        
+        super.init(
+            presentationData: presentationData,
+            updatedPresentationData: updatedPresentationData,
+            state: stateSignal,
+            tabBarItem: nil,
+            hideNavigationBarBackground: false
+        )
+        
+        pushImpl = { [weak self] c in
+            (self?.navigationController as? NavigationController)?.pushViewController(c)
+        }
+        presentImpl = { [weak self] c in
+            self?.present(c, in: .window(.root))
+        }
     }
     
     required public init(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
-    }
-    
-    override public func loadDisplayNode() {
-        self.displayNode = ASDisplayNode()
-        self.displayNode.backgroundColor = LightGramSettings.deepGraphiteBackground
-        self.displayNode.addSubnode(self.tableNode)
-        self.displayNodeDidLoad()
-    }
-    
-    override public func viewDidLoad() {
-        super.viewDidLoad()
-        self.view.backgroundColor = LightGramSettings.deepGraphiteBackground
-        self.setupTableView()
-    }
-    
-    override public func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        self.tableView.reloadData()
-    }
-    
-    override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
-        super.containerLayoutUpdated(layout, transition: transition)
-        let navLayout = self.navigationLayout(layout: layout)
-        let topOffset = self.navigationBar != nil ? navLayout.navigationFrame.maxY : (layout.statusBarHeight ?? 0)
-        let tableFrame = CGRect(x: 0, y: topOffset, width: layout.size.width, height: max(0, layout.size.height - topOffset))
-        transition.updateFrame(node: self.tableNode, frame: tableFrame)
-        self.tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: layout.intrinsicInsets.bottom, right: 0)
-    }
-    
-    private func setupTableView() {
-        self.tableView.contentInsetAdjustmentBehavior = .never
-        self.tableView.backgroundColor = LightGramSettings.deepGraphiteBackground
-        self.tableView.separatorColor = UIColor(white: 0.25, alpha: 1.0)
-        self.tableView.dataSource = self
-        self.tableView.delegate = self
-        self.tableView.tableHeaderView = self.makeHeaderView()
-    }
-    
-    private func makeHeaderView() -> UIView {
-        let screenWidth = UIScreen.main.bounds.width
-        let header = UIView(frame: CGRect(x: 0, y: 0, width: screenWidth, height: 160))
-        
-        let iconImageView = UIImageView()
-        iconImageView.layer.cornerRadius = 20
-        iconImageView.layer.masksToBounds = true
-        iconImageView.contentMode = .scaleAspectFill
-        
-        if let icon = UIImage(named: "Simple-iTunesArtwork") ?? UIImage(named: "AppIcon") ?? UIImage(contentsOfFile: "/opt/lightgram/submodules/LightGramCore/Resources/Logos/01_LightGram_Amber.png") {
-            iconImageView.image = icon
-        } else {
-            iconImageView.backgroundColor = UIColor(rgb: 0x1A1A1C)
-        }
-        iconImageView.translatesAutoresizingMaskIntoConstraints = false
-        header.addSubview(iconImageView)
-        
-        let titleLabel = UILabel()
-        titleLabel.text = LightGramStrings.tr("LightGram")
-        titleLabel.font = UIFont.systemFont(ofSize: 22, weight: .bold)
-        titleLabel.textColor = LightGramSettings.signatureYellowAccent
-        titleLabel.textAlignment = .center
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        header.addSubview(titleLabel)
-        
-        let subtitleLabel = UILabel()
-        subtitleLabel.text = "Alternative Telegram iOS Client • Version 1.0"
-        subtitleLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
-        subtitleLabel.textColor = UIColor(white: 0.65, alpha: 1.0)
-        subtitleLabel.textAlignment = .center
-        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        header.addSubview(subtitleLabel)
-        
-        NSLayoutConstraint.activate([
-            iconImageView.centerXAnchor.constraint(equalTo: header.centerXAnchor),
-            iconImageView.topAnchor.constraint(equalTo: header.topAnchor, constant: 16),
-            iconImageView.widthAnchor.constraint(equalToConstant: 64),
-            iconImageView.heightAnchor.constraint(equalToConstant: 64),
-            
-            titleLabel.topAnchor.constraint(equalTo: iconImageView.bottomAnchor, constant: 10),
-            titleLabel.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 16),
-            titleLabel.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -16),
-            
-            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
-            subtitleLabel.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 16),
-            subtitleLabel.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -16)
-        ])
-        
-        return header
-    }
-    
-    // MARK: - Sections & Rows
-    private enum Section: Int, CaseIterable {
-        case ghostMode
-        case spyMode
-        case notifications
-        case privacyAndSecurity
-        case smartFilters
-        case tools
-    }
-    
-    public func numberOfSections(in tableView: UITableView) -> Int {
-        return Section.allCases.count
-    }
-    
-    public func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        guard let s = Section(rawValue: section) else { return nil }
-        switch s {
-        case .ghostMode: return LightGramStrings.tr("GhostMode_Header")
-        case .spyMode: return LightGramStrings.tr("SpyMode_Header")
-        case .notifications: return LightGramStrings.tr("notifications")
-        case .privacyAndSecurity: return LightGramStrings.tr("PrivacyCenter_Header")
-        case .smartFilters: return LightGramStrings.tr("SmartFolders_Header")
-        case .tools: return LightGramStrings.tr("Settings")
-        }
-    }
-    
-    public func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
-        guard let s = Section(rawValue: section) else { return nil }
-        switch s {
-        case .ghostMode:
-            return LightGramStrings.tr("GhostMode_Master_Desc")
-        case .spyMode:
-            return LightGramStrings.tr("SpyMode_Master_Desc")
-        default:
-            return nil
-        }
-    }
-    
-    public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        guard let s = Section(rawValue: section) else { return 0 }
-        switch s {
-        case .ghostMode: return 5
-        case .spyMode: return 5
-        case .notifications: return 4
-        case .privacyAndSecurity: return 2
-        case .smartFilters: return 1
-        case .tools: return 11
-        }
-    }
-    
-    public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        guard let s = Section(rawValue: indexPath.section) else { return UITableViewCell() }
-        let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
-        cell.backgroundColor = LightGramSettings.cardSurfaceColor
-        cell.textLabel?.textColor = .white
-        cell.detailTextLabel?.textColor = UIColor(white: 0.65, alpha: 1.0)
-        
-        switch s {
-        case .ghostMode:
-            switch indexPath.row {
-            case 0:
-                cell.textLabel?.text = LightGramStrings.tr("GhostMode_Master")
-                let sw = self.makeSwitch(isOn: LightGramSettings.shared.isGhostModeEnabled) { [weak self] on in
-                    LightGramSettings.shared.isGhostModeEnabled = on
-                    self?.tableView.reloadData()
-                }
-                cell.accessoryView = sw
-            case 1:
-                cell.textLabel?.text = LightGramStrings.tr("GhostMode_NoReadReceipts")
-                let sw = self.makeSwitch(isOn: LightGramSettings.shared.suppressReadHistory) { on in
-                    LightGramSettings.shared.suppressReadHistory = on
-                }
-                sw.isEnabled = LightGramSettings.shared.isGhostModeEnabled
-                cell.accessoryView = sw
-            case 2:
-                cell.textLabel?.text = LightGramStrings.tr("GhostMode_HideTyping")
-                let sw = self.makeSwitch(isOn: LightGramSettings.shared.suppressTyping) { on in
-                    LightGramSettings.shared.suppressTyping = on
-                }
-                sw.isEnabled = LightGramSettings.shared.isGhostModeEnabled
-                cell.accessoryView = sw
-            case 3:
-                cell.textLabel?.text = LightGramStrings.tr("GhostMode_StealthStory")
-                let sw = self.makeSwitch(isOn: LightGramSettings.shared.suppressStoryViews) { on in
-                    LightGramSettings.shared.suppressStoryViews = on
-                }
-                sw.isEnabled = LightGramSettings.shared.isGhostModeEnabled
-                cell.accessoryView = sw
-            case 4:
-                cell.textLabel?.text = LightGramStrings.tr("GhostMode_MarkOnReply")
-                let sw = self.makeSwitch(isOn: LightGramSettings.shared.markAsReadOnReply) { on in
-                    LightGramSettings.shared.markAsReadOnReply = on
-                }
-                cell.accessoryView = sw
-            default: break
-            }
-            
-        case .spyMode:
-            switch indexPath.row {
-            case 0:
-                cell.textLabel?.text = LightGramStrings.tr("SpyMode_Master")
-                let sw = self.makeSwitch(isOn: LightGramSettings.shared.isSpyModeEnabled) { [weak self] on in
-                    LightGramSettings.shared.isSpyModeEnabled = on
-                    self?.tableView.reloadData()
-                }
-                cell.accessoryView = sw
-            case 1:
-                cell.textLabel?.text = LightGramStrings.tr("SpyMode_SaveDeleted")
-                let sw = self.makeSwitch(isOn: LightGramSettings.shared.saveDeletedMessages) { on in
-                    LightGramSettings.shared.saveDeletedMessages = on
-                }
-                sw.isEnabled = LightGramSettings.shared.isSpyModeEnabled
-                cell.accessoryView = sw
-            case 2:
-                cell.textLabel?.text = LightGramStrings.tr("SpyMode_SaveEdits")
-                let sw = self.makeSwitch(isOn: LightGramSettings.shared.saveEditHistory) { on in
-                    LightGramSettings.shared.saveEditHistory = on
-                }
-                sw.isEnabled = LightGramSettings.shared.isSpyModeEnabled
-                cell.accessoryView = sw
-            case 3:
-                cell.textLabel?.text = LightGramStrings.tr("SpyMode_OpenArchive")
-                cell.accessoryType = .disclosureIndicator
-            case 4:
-                cell.textLabel?.text = LightGramStrings.tr("PrivacyCenter_TTL")
-                cell.detailTextLabel?.text = "\(LightGramSettings.shared.retentionDaysTTL) days"
-            default: break
-            }
-            
-        case .privacyAndSecurity:
-            switch indexPath.row {
-            case 0:
-                cell.textLabel?.text = LightGramStrings.tr("PrivacyCenter_Biometrics")
-                let sw = self.makeSwitch(isOn: LightGramSettings.shared.biometricLockArchive) { on in
-                    LightGramSettings.shared.biometricLockArchive = on
-                }
-                cell.accessoryView = sw
-            case 1:
-                cell.textLabel?.text = "Forward Without Author Quote"
-                let sw = self.makeSwitch(isOn: LightGramSettings.shared.forwardWithoutQuoting) { on in
-                    LightGramSettings.shared.forwardWithoutQuoting = on
-                }
-                cell.accessoryView = sw
-            default: break
-            }
-            
-        case .notifications:
-            switch indexPath.row {
-            case 0:
-                cell.textLabel?.text = LightGramStrings.tr("notifications")
-                let sw = self.makeSwitch(isOn: LightGramSettings.shared.nativeNotificationsEnabled) { on in
-                    LightGramSettings.shared.nativeNotificationsEnabled = on
-                }
-                cell.accessoryView = sw
-            case 1:
-                cell.textLabel?.text = "APNs Categories"
-                cell.detailTextLabel?.text = "Message, Call, Vault, Stats"
-            case 2:
-                cell.textLabel?.text = "Badge Counter"
-                cell.detailTextLabel?.text = "\(LightGramSettings.shared.manualBadgeCount) (Tap to Reset)"
-                cell.accessoryType = .disclosureIndicator
-            case 3:
-                cell.textLabel?.text = "Cache Limit (iPhone 13 mini)"
-                cell.detailTextLabel?.text = "\(LightGramSettings.shared.maxDiskCacheLimitGB) GB"
-            default: break
-            }
-            
-        case .smartFilters:
-            cell.textLabel?.text = LightGramStrings.tr("SmartFolders_Header")
-            let sw = self.makeSwitch(isOn: LightGramSettings.shared.smartFiltersEnabled) { on in
-                LightGramSettings.shared.smartFiltersEnabled = on
-            }
-            cell.accessoryView = sw
-            
-        case .tools:
-            switch indexPath.row {
-            case 0:
-                cell.textLabel?.text = "Control Center (Dashboard)"
-                cell.accessoryType = .disclosureIndicator
-            case 1:
-                cell.textLabel?.text = LightGramStrings.tr("Statistics_Title")
-                cell.detailTextLabel?.text = "Dashboard & Charts"
-                cell.accessoryType = .disclosureIndicator
-            case 2:
-                cell.textLabel?.text = LightGramStrings.tr("MediaVault_Title")
-                cell.detailTextLabel?.text = LightGramMediaVaultManager.shared.formattedStorageSize()
-                cell.accessoryType = .disclosureIndicator
-            case 3:
-                cell.textLabel?.text = LightGramStrings.tr("CircleStudio_Title")
-                cell.detailTextLabel?.text = "1:1 Video Notes"
-                cell.accessoryType = .disclosureIndicator
-            case 4:
-                cell.textLabel?.text = LightGramStrings.tr("Logos_Title")
-                cell.detailTextLabel?.text = LightGramSettings.shared.activeLogoTheme.replacingOccurrences(of: "Icon", with: "")
-                cell.accessoryType = .disclosureIndicator
-            case 5:
-                cell.textLabel?.text = LightGramStrings.tr("SmartFolders_Title")
-                cell.accessoryType = .disclosureIndicator
-            case 6:
-                cell.textLabel?.text = LightGramStrings.tr("Notes_Title")
-                cell.accessoryType = .disclosureIndicator
-            case 7:
-                cell.textLabel?.text = LightGramStrings.tr("MediaCenter_Title")
-                cell.accessoryType = .disclosureIndicator
-            case 8:
-                cell.textLabel?.text = LightGramStrings.tr("PrivacyCenter_Title")
-                cell.accessoryType = .disclosureIndicator
-            case 9:
-                cell.textLabel?.text = LightGramStrings.tr("BotManager_Title")
-                cell.accessoryType = .disclosureIndicator
-            case 10:
-                cell.textLabel?.text = "Network Diagnostics"
-                cell.detailTextLabel?.text = "NWConnection / DC 2"
-                cell.accessoryType = .disclosureIndicator
-            default: break
-            }
-        }
-        
-        return cell
-    }
-    
-    private func makeSwitch(isOn: Bool, handler: @escaping (Bool) -> Void) -> UISwitch {
-        let sw = UISwitch()
-        sw.isOn = isOn
-        sw.onTintColor = LightGramSettings.signatureYellowAccent
-        let action = UIAction { [weak sw] _ in
-            guard let sw = sw else { return }
-            handler(sw.isOn)
-        }
-        sw.addAction(action, for: .valueChanged)
-        return sw
-    }
-    
-    public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
-        guard let s = Section(rawValue: indexPath.section) else { return }
-        
-        if s == .spyMode && indexPath.row == 3 {
-            let archiveVC = LightGramSpyArchiveController()
-            self.push(archiveVC)
-        } else if s == .notifications && indexPath.row == 2 {
-            LightGramSettings.shared.manualBadgeCount = 0
-            LightGramDesignSystem.Haptics.impact(.medium)
-            self.tableView.reloadData()
-        } else if s == .tools {
-            switch indexPath.row {
-            case 0:
-                self.push(LightGramControlCenterController(context: self.context))
-            case 1:
-                if let context = self.context {
-                    self.push(LightGramStatisticsController(context: context))
-                }
-            case 2:
-                if let context = self.context {
-                    self.push(LightGramMediaVaultController(context: context))
-                }
-            case 3:
-                if let context = self.context {
-                    self.push(LightGramCircleStudioController(context: context))
-                }
-            case 4:
-                if let context = self.context {
-                    self.push(LightGramLogosController(context: context))
-                }
-            case 5:
-                self.push(LightGramSmartFoldersController())
-            case 6:
-                self.push(LightGramNotesController())
-            case 7:
-                self.push(LightGramMediaCenterController())
-            case 8:
-                self.push(LightGramPrivacyCenterController())
-            case 9:
-                self.push(LightGramBotManagerController())
-            case 10:
-                self.push(LightGramNetworkDiagnosticsController())
-            default: break
-            }
-        }
     }
 }
