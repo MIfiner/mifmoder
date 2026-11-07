@@ -326,6 +326,18 @@ final class LightGramCoreTests: XCTestCase {
         XCTAssertFalse(LightGramStrings.tr("vault_menu").isEmpty)
         XCTAssertFalse(LightGramStrings.tr("Dashboard_OneTime").isEmpty)
         XCTAssertFalse(LightGramStrings.tr("Dashboard_Delete").isEmpty)
+        
+        // Test all languages explicitly to prevent duplicate key dictionary literal traps (SIGTRAP)
+        for lang in [LightGramLanguage.english, LightGramLanguage.russian, LightGramLanguage.polish] {
+            XCTAssertFalse(LightGramStrings.tr("LightGram", language: lang).isEmpty)
+            XCTAssertFalse(LightGramStrings.tr("Logos_Violet", language: lang).isEmpty)
+            XCTAssertFalse(LightGramStrings.tr("Logos_Violet_Desc", language: lang).isEmpty)
+            XCTAssertFalse(LightGramStrings.tr("GhostMode", language: lang).isEmpty)
+            XCTAssertFalse(LightGramStrings.tr("SpyMode", language: lang).isEmpty)
+            XCTAssertFalse(LightGramStrings.tr("Dashboard_Title", language: lang).isEmpty)
+            XCTAssertFalse(LightGramStrings.tr("Dashboard_OneTime", language: lang).isEmpty)
+            XCTAssertFalse(LightGramStrings.tr("Dashboard_Delete", language: lang).isEmpty)
+        }
     }
     
     func testMediaVaultOperations() {

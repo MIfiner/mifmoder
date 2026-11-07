@@ -18,8 +18,11 @@ public enum LightGramLanguage: String {
 
 public struct LightGramStrings {
     public static func tr(_ key: String) -> String {
-        let lang = LightGramLanguage.current
-        if let dict = strings[lang], let val = dict[key] {
+        return self.tr(key, language: LightGramLanguage.current)
+    }
+    
+    public static func tr(_ key: String, language: LightGramLanguage) -> String {
+        if let dict = strings[language], let val = dict[key] {
             return val
         }
         if let fallback = strings[.english]?[key] {
@@ -454,8 +457,6 @@ public struct LightGramStrings {
             "Logos_Red_Desc": "Тема с красным акцентом (Warning/Alert)",
             "Logos_Purple": "LightGram Purple",
             "Logos_Purple_Desc": "Премиум тема (Purple/VIP)",
-            "Logos_Violet": "LightGram Violet",
-            "Logos_Violet_Desc": "Ночная тема (Violet/Dark Mode)",
             "Dashboard_OneTime": "Одноразовое",
             "Dashboard_Settings": "Настройки",
             "Dashboard_Stats": "Статистика",
@@ -672,8 +673,6 @@ public struct LightGramStrings {
             "Logos_Red_Desc": "Motyw ostrzegawczy (Warning/Alert)",
             "Logos_Purple": "LightGram Purple",
             "Logos_Purple_Desc": "Motyw VIP (Purple/VIP)",
-            "Logos_Violet": "LightGram Violet",
-            "Logos_Violet_Desc": "Tryb nocny (Violet/Dark Mode)",
             "Dashboard_OneTime": "Jednorazowe",
             "Dashboard_Settings": "Ustawienia",
             "Dashboard_Stats": "Statystyki",
