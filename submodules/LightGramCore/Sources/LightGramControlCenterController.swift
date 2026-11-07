@@ -601,7 +601,9 @@ private enum LightGramEntry: ItemListNodeEntry {
                         activityItems.insert(tempURL, at: 0)
                     }
                     let activity = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
-                    args.present(activity)
+                    if let context = args.context {
+                        context.sharedContext.applicationBindings.presentNativeController(activity)
+                    }
                 }
             )
         case .advancedFooter:
