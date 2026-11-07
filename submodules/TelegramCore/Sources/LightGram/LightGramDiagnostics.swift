@@ -1,12 +1,16 @@
 import Foundation
 import UIKit
 import os.log
+import Darwin
 import SwiftSignalKit
+
+private func lightGramSignalCallback(_ sig: Int32) {
+    LightGramDiagnostics.shared.handleCrashSignal(sig)
+}
 
 public final class LightGramDiagnostics {
     public static let shared = LightGramDiagnostics()
     
-    private let queue = DispatchQueue(label: "site.lightgram.diagnostics", qos: .utility)
     private let lock = NSLock()
     
     private let appSupportURL: URL
@@ -55,12 +59,22 @@ public final class LightGramDiagnostics {
         
         self.openLogFile()
         
+        // Register POSIX crash signal handlers
+        self.setupSignalHandlers()
+        
         // Log startup banner
         self.logInternal("=== LIGHTGRAM DIAGNOSTICS INITIALIZED ===")
         self.logInternal("Device: \(UIDevice.current.model) iOS: \(UIDevice.current.systemVersion)")
         if self.didCrashDuringSettingsOpen() {
             let lastStage = (try? String(contentsOf: self.lastStageURL, encoding: .utf8)) ?? "Unknown"
             self.logInternal("CRASH DETECTED ON PREVIOUS RUN! Last stage: \(lastStage)")
+        }
+    }
+    
+    private func setupSignalHandlers() {
+        let signals: [Int32] = [SIGABRT, SIGSEGV, SIGBUS, SIGILL, SIGTRAP, SIGFPE]
+        for s in signals {
+            Darwin.signal(s, lightGramSignalCallback)
         }
     }
     
@@ -88,6 +102,10 @@ public final class LightGramDiagnostics {
         // Mirror to Apple system Unified Logging
         let osLog = OSLog(subsystem: "site.lightgram.ios", category: "Breadcrumbs")
         os_log("%{public}@", log: osLog, type: .default, entry)
+        
+        // Also write to stderr for immediate console observation
+        fputs(entry, stderr)
+        fflush(stderr)
     }
     
     private func logInternal(_ message: String) {
@@ -97,36 +115,34 @@ public final class LightGramDiagnostics {
     }
     
     private func appendAndSync(_ line: String) {
-        self.queue.async {
-            self.lock.lock()
-            defer { self.lock.unlock() }
-            
-            guard let data = line.data(using: .utf8) else { return }
-            
-            // Check size limit and rotate if needed
-            if let handle = self.fileHandle {
-                let currentOffset = handle.offsetInFile
-                if currentOffset > UInt64(self.maxLogSizeBytes) {
-                    handle.closeFile()
-                    self.rotateLogs()
-                    self.openLogFile()
-                }
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        
+        guard let data = line.data(using: .utf8) else { return }
+        
+        // Check size limit and rotate if needed
+        if let handle = self.fileHandle {
+            let currentOffset = handle.offsetInFile
+            if currentOffset > UInt64(self.maxLogSizeBytes) {
+                handle.closeFile()
+                self.rotateLogs()
+                self.openLogFile()
             }
-            
-            if let handle = self.fileHandle {
-                handle.write(data)
-                handle.synchronizeFile()
-            }
-            
-            // Mirror to Documents for Files app visibility
-            if let docHandle = try? FileHandle(forWritingTo: self.docBreadcrumbsURL) {
-                docHandle.seekToEndOfFile()
-                docHandle.write(data)
-                docHandle.synchronizeFile()
-                docHandle.closeFile()
-            } else {
-                try? line.write(to: self.docBreadcrumbsURL, atomically: true, encoding: .utf8)
-            }
+        }
+        
+        if let handle = self.fileHandle {
+            handle.write(data)
+            handle.synchronizeFile()
+        }
+        
+        // Mirror to Documents for Files app visibility
+        if let docHandle = try? FileHandle(forWritingTo: self.docBreadcrumbsURL) {
+            docHandle.seekToEndOfFile()
+            docHandle.write(data)
+            docHandle.synchronizeFile()
+            docHandle.closeFile()
+        } else {
+            try? line.write(to: self.docBreadcrumbsURL, atomically: true, encoding: .utf8)
         }
     }
     
@@ -151,13 +167,11 @@ public final class LightGramDiagnostics {
         
         self.log("STAGE_REACHED: \(stage)")
         
-        self.queue.async {
-            self.lock.lock()
-            defer { self.lock.unlock() }
-            
-            try? content.write(to: self.lastStageURL, atomically: true, encoding: .utf8)
-            try? content.write(to: self.docLastStageURL, atomically: true, encoding: .utf8)
-        }
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        
+        try? content.write(to: self.lastStageURL, atomically: true, encoding: .utf8)
+        try? content.write(to: self.docLastStageURL, atomically: true, encoding: .utf8)
     }
     
     public func beginOpeningSettings() {
@@ -166,14 +180,12 @@ public final class LightGramDiagnostics {
         
         self.log(">>> BEGIN_OPENING_SETTINGS")
         
-        self.queue.async {
-            self.lock.lock()
-            defer { self.lock.unlock() }
-            
-            try? content.write(to: self.crashMarkerURL, atomically: true, encoding: .utf8)
-            try? content.write(to: self.lastStageURL, atomically: true, encoding: .utf8)
-            try? content.write(to: self.docLastStageURL, atomically: true, encoding: .utf8)
-        }
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        
+        try? content.write(to: self.crashMarkerURL, atomically: true, encoding: .utf8)
+        try? content.write(to: self.lastStageURL, atomically: true, encoding: .utf8)
+        try? content.write(to: self.docLastStageURL, atomically: true, encoding: .utf8)
     }
     
     public func finishOpeningSettings() {
@@ -182,16 +194,14 @@ public final class LightGramDiagnostics {
         
         self.log("<<< FINISH_OPENING_SETTINGS_SUCCESS")
         
-        self.queue.async {
-            self.lock.lock()
-            defer { self.lock.unlock() }
-            
-            // Remove crash marker indicating success
-            let fm = FileManager.default
-            let _ = try? fm.removeItem(at: self.crashMarkerURL)
-            try? content.write(to: self.lastStageURL, atomically: true, encoding: .utf8)
-            try? content.write(to: self.docLastStageURL, atomically: true, encoding: .utf8)
-        }
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        
+        // Remove crash marker indicating success
+        let fm = FileManager.default
+        let _ = try? fm.removeItem(at: self.crashMarkerURL)
+        try? content.write(to: self.lastStageURL, atomically: true, encoding: .utf8)
+        try? content.write(to: self.docLastStageURL, atomically: true, encoding: .utf8)
     }
     
     public func didCrashDuringSettingsOpen() -> Bool {
@@ -209,6 +219,53 @@ public final class LightGramDiagnostics {
             return content.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         return "None"
+    }
+    
+    // MARK: - Crash Signal & Exception Handling
+    
+    public func handleCrashSignal(_ sig: Int32) {
+        let signalName: String
+        switch sig {
+        case SIGABRT: signalName = "SIGABRT (6 - Abort/assert)"
+        case SIGSEGV: signalName = "SIGSEGV (11 - Segmentation fault)"
+        case SIGBUS: signalName = "SIGBUS (10 - Bus error)"
+        case SIGILL: signalName = "SIGILL (4 - Illegal instruction)"
+        case SIGTRAP: signalName = "SIGTRAP (5 - Trace trap/fatalError)"
+        case SIGFPE: signalName = "SIGFPE (8 - Floating point exception)"
+        default: signalName = "SIGNAL (\(sig))"
+        }
+        
+        let timestamp = self.dateFormatter.string(from: Date())
+        let symbols = Thread.callStackSymbols.joined(separator: "\n")
+        let stage = self.lastRecordedStage()
+        let report = """
+        === LIGHTGRAM CRASH SIGNAL REPORT ===
+        Time: \(timestamp)
+        Signal: \(signalName)
+        Last Stage: \(stage)
+        Thread: \(self.currentExecutionEnvironment())
+        Call Stack:
+        \(symbols)
+        =====================================
+        \n
+        """
+        
+        // Write report directly using POSIX file descriptor for signal-safety
+        if let path = self.docCrashReportURL.path.cString(using: .utf8) {
+            let fd = Darwin.open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644)
+            if fd >= 0 {
+                if let reportData = report.cString(using: .utf8) {
+                    let _ = Darwin.write(fd, reportData, strlen(reportData))
+                }
+                Darwin.fsync(fd)
+                Darwin.close(fd)
+            }
+        }
+        
+        self.appendAndSync("CRITICAL_CRASH_SIGNAL: \(signalName) [Stage: \(stage)]\n")
+        
+        Darwin.signal(sig, SIG_DFL)
+        Darwin.raise(sig)
     }
     
     // MARK: - Export
@@ -243,14 +300,14 @@ public final class LightGramDiagnostics {
         summary += "Crash Marker Exists: \(self.didCrashDuringSettingsOpen())\n"
         summary += "Last Stage: \(self.lastRecordedStage())\n\n"
         
-        if let breadcrumbs = try? String(contentsOf: self.breadcrumbsURL, encoding: .utf8) {
-            let lines = breadcrumbs.components(separatedBy: "\n")
-            let recentLines = lines.suffix(60).joined(separator: "\n")
-            summary += "--- RECENT BREADCRUMBS (Last 60 lines) ---\n\(recentLines)\n"
+        if let crashReport = try? String(contentsOf: self.docCrashReportURL, encoding: .utf8), !crashReport.isEmpty {
+            summary += "--- LAST CRASH REPORT ---\n\(crashReport)\n\n"
         }
         
-        if let crashReport = try? String(contentsOf: self.docCrashReportURL, encoding: .utf8) {
-            summary += "\n--- LAST EXCEPTION REPORT ---\n\(crashReport)\n"
+        if let breadcrumbs = try? String(contentsOf: self.breadcrumbsURL, encoding: .utf8) {
+            let lines = breadcrumbs.components(separatedBy: "\n").filter { !$0.isEmpty }
+            let recentLines = lines.suffix(100).joined(separator: "\n")
+            summary += "--- RECENT BREADCRUMBS (Last 100 lines) ---\n\(recentLines)\n"
         }
         
         return summary

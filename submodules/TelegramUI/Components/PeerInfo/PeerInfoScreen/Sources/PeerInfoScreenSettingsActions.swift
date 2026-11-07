@@ -65,12 +65,25 @@ extension PeerInfoScreenNode {
         case .lightGram:
             LightGramDiagnostics.shared.log("SETTINGS_ACTIONS: openSettings(.lightGram) triggered")
             LightGramDiagnostics.shared.recordStage("SETTINGS_ACTION_LIGHTGRAM_ENTER")
+            
+            LightGramDiagnostics.shared.log("SETTINGS_ACTIONS: Instantiating lightGramControlCenterController")
             let controller = lightGramControlCenterController(context: self.context)
             LightGramDiagnostics.shared.log("SETTINGS_ACTIONS: Created lightGramControlCenterController: \(type(of: controller))")
             LightGramDiagnostics.shared.recordStage("SETTINGS_ACTION_CONTROLLER_CREATED")
-            push(controller)
-            LightGramDiagnostics.shared.log("SETTINGS_ACTIONS: push(controller) call completed")
-            LightGramDiagnostics.shared.recordStage("SETTINGS_ACTION_PUSH_COMPLETED")
+            
+            if let parentController = self.controller {
+                LightGramDiagnostics.shared.log("SETTINGS_ACTIONS: Calling self.controller?.push(controller)")
+                LightGramDiagnostics.shared.recordStage("SETTINGS_ACTION_CALLING_CONTROLLER_PUSH")
+                parentController.push(controller)
+                LightGramDiagnostics.shared.log("SETTINGS_ACTIONS: self.controller?.push returned successfully")
+                LightGramDiagnostics.shared.recordStage("SETTINGS_ACTION_PUSH_RETURNED")
+            } else {
+                LightGramDiagnostics.shared.log("SETTINGS_ACTIONS: Calling local push(controller)")
+                LightGramDiagnostics.shared.recordStage("SETTINGS_ACTION_CALLING_LOCAL_PUSH")
+                push(controller)
+                LightGramDiagnostics.shared.log("SETTINGS_ACTIONS: local push returned successfully")
+                LightGramDiagnostics.shared.recordStage("SETTINGS_ACTION_PUSH_RETURNED")
+            }
         case .lightGramDiagnostics:
             LightGramDiagnostics.shared.log("SETTINGS_ACTIONS: openSettings(.lightGramDiagnostics) triggered")
             let files = LightGramDiagnostics.shared.getAllLogFiles()

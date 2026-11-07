@@ -609,7 +609,7 @@ private enum LightGramEntry: ItemListNodeEntry {
         case .advancedFooter:
             return ItemListTextItem(
                 presentationData: presentationData,
-                text: .plain("LightGram Personal Edition v2.0 (Build 131945) — iPhone 13 mini"),
+                text: .plain("LightGram Personal Edition v2.0 (Build 131955) — iPhone 13 mini"),
                 sectionId: self.section
             )
         }
@@ -734,7 +734,7 @@ public func lightGramControlCenterController(context: AccountContext? = nil) -> 
             leftNavigationButton: nil,
             rightNavigationButton: nil,
             backNavigationButton: ItemListBackButton(title: pData.strings.Common_Back),
-            animateChanges: true
+            animateChanges: false
         )
         LightGramDiagnostics.shared.log("CONTROL_CENTER_SIGNAL: Building control center entries")
         let entries = lightGramControlCenterEntries(state: state)
@@ -745,7 +745,7 @@ public func lightGramControlCenterController(context: AccountContext? = nil) -> 
             presentationData: pData,
             entries: entries,
             style: .blocks,
-            animateChanges: true
+            animateChanges: false
         )
         LightGramDiagnostics.shared.log("CONTROL_CENTER_SIGNAL: ItemListNodeState created")
         LightGramDiagnostics.shared.recordStage("CONTROL_CENTER_LIST_STATE_CREATED")
