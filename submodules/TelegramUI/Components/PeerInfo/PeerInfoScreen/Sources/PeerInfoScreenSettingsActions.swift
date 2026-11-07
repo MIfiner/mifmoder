@@ -86,7 +86,7 @@ extension PeerInfoScreenNode {
                 activityController.popoverPresentationController?.sourceView = window
                 activityController.popoverPresentationController?.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
             }
-            self.controller?.present(activityController, in: .window(.root))
+            self.context.sharedContext.applicationBindings.presentNativeController(activityController)
         case .avatar:
             self.controller?.openAvatarForEditing()
         case .edit:
