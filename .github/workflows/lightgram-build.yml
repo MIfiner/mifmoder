@@ -44,11 +44,15 @@ jobs:
     timeout-minutes: 180
 
     steps:
-      - name: Checkout LightGram source code and submodules
+      - name: Checkout LightGram source code
         uses: actions/checkout@v4
         with:
-          submodules: 'recursive'
           fetch-depth: '0'
+          submodules: 'false'
+
+      - name: Checkout submodules shallow
+        run: |
+          git submodule update --init --recursive --depth 1
 
       - name: Inspect environment and toolchain
         run: |
