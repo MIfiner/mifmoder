@@ -30,3 +30,4 @@ common:macos --features=oso_prefix_is_pwd
 
 common --http_timeout_scaling=3.0
 common --experimental_repository_downloader_retries=10
+common --repository_cache=/private/var/tmp/bazel-repo-cache

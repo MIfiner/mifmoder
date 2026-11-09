@@ -204,6 +204,13 @@ jobs:
           restore-keys: |
             bazel-disk-cache-${{ runner.os }}-
 
+      - name: Prefetch external dependencies into Bazel repository cache
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /private/var/tmp/bazel-repo-cache
+          python3 build-system/Make/PrefetchBzlmod.py /private/var/tmp/bazel-repo-cache MODULE.bazel.lock || true
+
       - name: Build LightGram V1 via Bazel
         env:
           INPUT_CONFIGURATION: ${{ inputs.configuration }}
