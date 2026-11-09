@@ -217,6 +217,7 @@ jobs:
           LIGHTGRAM_API_ID: ${{ secrets.LIGHTGRAM_API_ID }}
           LIGHTGRAM_API_HASH: ${{ secrets.LIGHTGRAM_API_HASH }}
           LIGHTGRAM_REQUIRE_PRODUCTION_CREDENTIALS: "true"
+          BAZEL_HTTP_RULES_URLS_AS_DEFAULT_CANONICAL_ID: "0"
         run: |
           set -x
 

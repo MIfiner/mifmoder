@@ -48,6 +48,11 @@ def main():
 
         if os.path.isfile(target_file) and os.path.getsize(target_file) > 0:
             print(f"Already cached: {url}")
+            url_id_hash = hashlib.sha256(url.encode("utf-8")).hexdigest()
+            marker_file = os.path.join(target_dir, f"id-{url_id_hash}")
+            if not os.path.isfile(marker_file):
+                with open(marker_file, "w") as mf:
+                    mf.write(f"{url}\n")
             continue
 
         os.makedirs(target_dir, exist_ok=True)
@@ -85,6 +90,10 @@ def main():
                 actual_sha256 = hashlib.sha256(f.read()).hexdigest()
             if actual_sha256 == expected_sha256:
                 print(f"Verified OK: {url}")
+                url_id_hash = hashlib.sha256(url.encode("utf-8")).hexdigest()
+                marker_file = os.path.join(target_dir, f"id-{url_id_hash}")
+                with open(marker_file, "w") as mf:
+                    mf.write(f"{url}\n")
             else:
                 print(f"Checksum mismatch for {url}: expected {expected_sha256}, got {actual_sha256}")
                 try:
