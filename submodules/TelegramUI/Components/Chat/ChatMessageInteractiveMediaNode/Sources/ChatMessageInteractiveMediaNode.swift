@@ -1191,7 +1191,8 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                         case .constrained:
                             if isSecretMedia {
                                 boundingSize = CGSize(width: maxWidth, height: maxWidth / 5.0 * 3.0)
-                                drawingSize = nativeSize.aspectFilled(boundingSize)
+                                let safeNativeSize = CGSize(width: max(1.0, nativeSize.width), height: max(1.0, nativeSize.height))
+                                drawingSize = safeNativeSize.aspectFilled(boundingSize)
                             } else {
                                 let fittedSize = nativeSize.fittedToWidthOrSmaller(boundingWidth)
                                 let filledSize: CGSize
@@ -2338,6 +2339,8 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                                     imageDimensions = dimensions.cgSize
                                 } else if let file = media as? TelegramMediaWebFile, let dimensions = file.dimensions {
                                     imageDimensions = dimensions.cgSize
+                                } else if isSecretMedia {
+                                    imageDimensions = boundingSize
                                 }
 
                                 if let imageDimensions = imageDimensions {

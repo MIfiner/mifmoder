@@ -632,6 +632,8 @@ func textMediaAndExpirationTimerFromApiMedia(_ media: Api.MessageMedia?, _ peerI
             if let photo = photo {
                 if let mediaImage = telegramMediaImageFromApiPhoto(photo, video: messageMediaPhotoData.video) {
                     return (mediaImage, ttlSeconds, nil, (flags & (1 << 3)) != 0, nil, nil)
+                } else {
+                    return (TelegramMediaExpiredContent(data: .image), nil, nil, nil, nil, nil)
                 }
             } else {
                 return (TelegramMediaExpiredContent(data: .image), nil, nil, nil, nil, nil)
@@ -658,6 +660,16 @@ func textMediaAndExpirationTimerFromApiMedia(_ media: Api.MessageMedia?, _ peerI
             if let document = document {
                 if let mediaFile = telegramMediaFileFromApiDocument(document, altDocuments: altDocuments, videoCover: coverPhoto) {
                     return (mediaFile, ttlSeconds, (flags & (1 << 3)) != 0, (flags & (1 << 4)) != 0, nil, videoTimestamp)
+                } else {
+                    var data: TelegramMediaExpiredContentData
+                    if (flags & (1 << 7)) != 0 {
+                        data = .videoMessage
+                    } else if (flags & (1 << 8)) != 0 {
+                        data = .voiceMessage
+                    } else {
+                        data = .file
+                    }
+                    return (TelegramMediaExpiredContent(data: data), nil, nil, nil, nil, nil)
                 }
             } else {
                 var data: TelegramMediaExpiredContentData

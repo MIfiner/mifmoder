@@ -131,11 +131,11 @@ public class ChatMessageMediaBubbleContentNode: ChatMessageBubbleContentNode {
                 for media in item.message.media {
                     if let telegramImage = media as? TelegramMediaImage {
                         selectedMedia = telegramImage
-                        if shouldDownloadMediaAutomatically(settings: item.controllerInteraction.automaticMediaDownloadSettings, peerType: item.associatedData.automaticDownloadPeerType, networkType: item.associatedData.automaticDownloadNetworkType, authorPeerId: item.message.author?.id, contactsPeerIds: item.associatedData.contactsPeerIds, media: .image(telegramImage)) {
+                        if !item.message.containsSecretMedia && shouldDownloadMediaAutomatically(settings: item.controllerInteraction.automaticMediaDownloadSettings, peerType: item.associatedData.automaticDownloadPeerType, networkType: item.associatedData.automaticDownloadNetworkType, authorPeerId: item.message.author?.id, contactsPeerIds: item.associatedData.contactsPeerIds, media: .image(telegramImage)) {
                             automaticDownload = .full
                         }
                         
-                        if let _ = telegramImage.video {
+                        if let _ = telegramImage.video, !item.message.containsSecretMedia {
                             automaticPlayback = true
                             isLivePhoto = true
                         }
@@ -429,7 +429,16 @@ public class ChatMessageMediaBubbleContentNode: ChatMessageBubbleContentNode {
                 automaticDownload = .full
             }
             
-            let (unboundSize, initialWidth, refineLayout) = interactiveImageLayout(item.context, item.presentationData, item.presentationData.dateTimeFormat, EngineMessage(item.message), item.associatedData, item.attributes, EngineMedia(selectedMedia!), selectedMediaIndex, dateAndStatus, automaticDownload, item.associatedData.automaticDownloadPeerType, item.associatedData.automaticDownloadPeerId, sizeCalculation, layoutConstants, contentMode, item.controllerInteraction.presentationContext)
+            let safeMedia: EngineMedia
+            if let selectedMedia = selectedMedia {
+                safeMedia = EngineMedia(selectedMedia)
+            } else if let firstMedia = item.message.media.first {
+                safeMedia = EngineMedia(firstMedia)
+            } else {
+                safeMedia = EngineMedia(TelegramMediaExpiredContent(data: .image))
+            }
+            
+            let (unboundSize, initialWidth, refineLayout) = interactiveImageLayout(item.context, item.presentationData, item.presentationData.dateTimeFormat, EngineMessage(item.message), item.associatedData, item.attributes, safeMedia, selectedMediaIndex, dateAndStatus, automaticDownload, item.associatedData.automaticDownloadPeerType, item.associatedData.automaticDownloadPeerId, sizeCalculation, layoutConstants, contentMode, item.controllerInteraction.presentationContext)
             
             let forceFullCorners = false
             let contentProperties = ChatMessageBubbleContentProperties(hidesSimpleAuthorHeader: true, headerSpacing: 7.0, hidesBackground: .emptyWallpaper, forceFullCorners: forceFullCorners, forceAlignment: .none)

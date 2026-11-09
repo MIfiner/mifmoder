@@ -514,6 +514,10 @@ private func contentNodeMessagesAndClassesForItem(_ item: ChatMessageItem) -> ([
         needReactions = false
     }
     
+    if result.isEmpty {
+        result.append((firstMessage, ChatMessageActionBubbleContentNode.self, ChatMessageEntryAttributes(), BubbleItemAttributes(isAttachment: false, neighborType: .text, neighborSpacing: .default)))
+    }
+    
     // The last element reports unsupported content, which the caller needs before it can decide
     // bubble width and share-button visibility.
     return (result, needSeparateContainers, needReactions, isUnsupportedMedia)

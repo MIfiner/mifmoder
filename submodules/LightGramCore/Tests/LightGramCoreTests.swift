@@ -1,5 +1,6 @@
 import XCTest
 import Display
+import TelegramCore
 @testable import LightGramCore
 
 final class LightGramCoreTests: XCTestCase {
@@ -498,5 +499,88 @@ final class LightGramCoreTests: XCTestCase {
         )
         controller.containerLayoutUpdated(layout, transition: .immediate)
         XCTAssertTrue(controller.isNodeLoaded)
+    }
+    
+    func testViewOnceSafeMediaFallback() {
+        // Test 1: TelegramMediaExpiredContent correctly carries image expired state
+        let expiredImage = TelegramMediaExpiredContent(data: .image)
+        XCTAssertEqual(expiredImage.data, .image)
+        
+        // Test 2: TelegramMediaExpiredContent correctly carries file expired state
+        let expiredFile = TelegramMediaExpiredContent(data: .file)
+        XCTAssertEqual(expiredFile.data, .file)
+        
+        // Test 3: Safe media resolution fallback when selectedMedia is nil
+        let selectedMedia: Media? = nil
+        let messageMedia: [Media] = []
+        
+        let safeMedia: Media
+        if let selected = selectedMedia {
+            safeMedia = selected
+        } else if let firstMedia = messageMedia.first {
+            safeMedia = firstMedia
+        } else {
+            safeMedia = TelegramMediaExpiredContent(data: .image)
+        }
+        
+        XCTAssertTrue(safeMedia is TelegramMediaExpiredContent)
+        if let resolvedExpired = safeMedia as? TelegramMediaExpiredContent {
+            XCTAssertEqual(resolvedExpired.data, .image)
+        }
+    }
+    
+    func testViewOnceTimeoutAttributeConstants() {
+        let attribute = AutoremoveTimeoutMessageAttribute(timeout: viewOnceTimeout, countdownBeginTime: nil)
+        XCTAssertEqual(attribute.timeout, viewOnceTimeout)
+        XCTAssertEqual(viewOnceTimeout, 0x7fffffff)
+    }
+    
+    func testAspectFilledDegenerateGeometrySafety() {
+        let boundingSize = CGSize(width: 320.0, height: 192.0)
+        
+        // When nativeSize has 0 or degenerate dimensions
+        let zeroSize = CGSize(width: 0.0, height: 0.0)
+        let safeNativeSize = CGSize(width: max(1.0, zeroSize.width), height: max(1.0, zeroSize.height))
+        let drawingSize = safeNativeSize.aspectFilled(boundingSize)
+        
+        XCTAssertFalse(drawingSize.width.isNaN)
+        XCTAssertFalse(drawingSize.height.isNaN)
+        XCTAssertFalse(drawingSize.width.isInfinite)
+        XCTAssertFalse(drawingSize.height.isInfinite)
+        XCTAssertGreaterThanOrEqual(drawingSize.width, 1.0)
+        XCTAssertGreaterThanOrEqual(drawingSize.height, 1.0)
+    }
+    
+    func testMediaVaultSaveViewOncePreservation() {
+        // Verify that View Once media remains savable in Media Vault
+        let vault = LightGramMediaVaultManager.shared
+        let expectation = self.expectation(description: "Media Vault View Once save")
+        
+        let dummyPeerId: Int64 = 112233
+        let dummyMsgId: Int32 = 777
+        let dummyChatTitle = "VIP Chat"
+        let dummyAuthor = "Sender"
+        
+        // Save direct View Once photo reference
+        vault.saveMedia(
+            peerId: dummyPeerId,
+            messageId: dummyMsgId,
+            chatTitle: dummyChatTitle,
+            authorName: dummyAuthor,
+            media: "test_view_once_content",
+            isOneTime: true,
+            account: nil
+        ) { success, msg in
+            XCTAssertTrue(success)
+            expectation.fulfill()
+        }
+        
+        waitForExpectations(timeout: 2.0, handler: nil)
+        
+        // Verify vault item recorded as one-time
+        let items = vault.fetchItems(category: nil)
+        let found = items.first(where: { $0.messageId == dummyMsgId && $0.isOneTime })
+        XCTAssertNotNil(found)
+        XCTAssertTrue(found?.isOneTime ?? false)
     }
 }

@@ -68,6 +68,9 @@ final class InChatPrefetchManager {
         
         var validIds = Set<MediaId>()
         for (message, media) in self.messages {
+            if message.containsSecretMedia || message.minAutoremoveOrClearTimeout == viewOnceTimeout {
+                continue
+            }
             guard let id = media.id else {
                 continue
             }
