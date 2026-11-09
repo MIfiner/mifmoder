@@ -27,3 +27,6 @@ build:macos --strategy=SwiftCompile=worker
 
 common:macos --features=swift.use_global_module_cache
 common:macos --features=oso_prefix_is_pwd
+
+common --http_timeout_scaling=3.0
+common --experimental_repository_downloader_retries=10
